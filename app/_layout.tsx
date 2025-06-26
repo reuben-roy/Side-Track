@@ -1,9 +1,12 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
+import OnboardingCarousel from '@/components/OnboardingCarousel';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function RootLayout() {
@@ -11,10 +14,26 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
 
-  if (!loaded) {
-    // Async font loading only occurs in development.
+  useEffect(() => {
+    (async () => {
+      const seen = await AsyncStorage.getItem('onboardingComplete');
+      setShowOnboarding(seen !== 'true');
+    })();
+  }, []);
+
+  const handleGetStarted = async () => {
+    await AsyncStorage.setItem('onboardingComplete', 'true');
+    setShowOnboarding(false);
+  };
+
+  if (!loaded || showOnboarding === null) {
     return null;
+  }
+
+  if (showOnboarding) {
+    return <OnboardingCarousel onGetStarted={handleGetStarted} />;
   }
 
   return (
