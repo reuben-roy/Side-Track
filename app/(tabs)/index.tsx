@@ -1,12 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { exercises } from '../../constants/Exercises';
 import WorkoutScreen from './WorkoutScreen';
 
-const EXERCISES = ['Squats', 'Push-ups', 'Lunges'];
-const WEIGHTS = ['10kg', '20kg', '30kg'];
-const REPS = ['10 reps', '15 reps', '20 reps'];
 const ITEM_HEIGHT = 48;
 const { width } = Dimensions.get('window');
+
+const EXERCISES = exercises.map(e => e.name);
 
 function SlotPicker({ data, selectedIndex, onSelect }: { data: string[]; selectedIndex: number; onSelect: (i: number) => void }) {
   const flatListRef = useRef<FlatList>(null);
@@ -45,14 +45,24 @@ function SlotPicker({ data, selectedIndex, onSelect }: { data: string[]; selecte
 
 export default function HomeScreen() {
   const [exerciseIdx, setExerciseIdx] = useState(0);
-  const [weightIdx, setWeightIdx] = useState(1);
-  const [repsIdx, setRepsIdx] = useState(1);
+  const [weightIdx, setWeightIdx] = useState(0);
+  const [repsIdx, setRepsIdx] = useState(0);
   const [showWorkout, setShowWorkout] = useState(false);
 
+  const selectedExercise = exercises[exerciseIdx];
+  const WEIGHTS = selectedExercise.weights.map(w => typeof w === 'number' ? `${w} lbs` : w);
+  const REPS = selectedExercise.reps.map(r => `${r} reps`);
+
+  React.useEffect(() => {
+    setWeightIdx(0);
+    setRepsIdx(0);
+  }, [exerciseIdx]);
+
   const spin = () => {
-    setExerciseIdx(Math.floor(Math.random() * EXERCISES.length));
-    setWeightIdx(Math.floor(Math.random() * WEIGHTS.length));
-    setRepsIdx(Math.floor(Math.random() * REPS.length));
+    const newExerciseIdx = Math.floor(Math.random() * EXERCISES.length);
+    setExerciseIdx(newExerciseIdx);
+    setWeightIdx(Math.floor(Math.random() * exercises[newExerciseIdx].weights.length));
+    setRepsIdx(Math.floor(Math.random() * exercises[newExerciseIdx].reps.length));
   };
 
   if (showWorkout) {
@@ -69,7 +79,8 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Workout Generator</Text>
-      <Text style={styles.title}>Spin the wheel to pick{`\n`}your workout!</Text>
+      <Text style={styles.title}>Spin the wheel to pick{
+}your workout!</Text>
       <View style={styles.slotRow}>
         <View style={styles.slotCol}>
           <SlotPicker data={EXERCISES} selectedIndex={exerciseIdx} onSelect={setExerciseIdx} />

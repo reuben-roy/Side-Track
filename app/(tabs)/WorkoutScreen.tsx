@@ -10,9 +10,7 @@ interface WorkoutScreenProps {
 }
 
 const initialSets = [
-  { set: 1, weight: '135', reps: '8' },
-//   { set: 2, weight: '145', reps: '10' },
-//   { set: 3, weight: '155', reps: '12' },
+  { set: 1, weight: '135', reps: '8' }
 ];
 
 export default function WorkoutScreen({ exercise, weight, reps, onClose }: WorkoutScreenProps) {

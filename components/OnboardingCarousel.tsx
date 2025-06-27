@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import React, { useRef } from 'react';
 import { Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -24,7 +25,7 @@ const slides = [
   },
 ];
 
-export default function OnboardingCarousel({ onGetStarted }: { onGetStarted: () => void }) {
+export default function OnboardingCarousel() {
   const flatListRef = useRef<FlatList>(null);
   const [currentIndex, setCurrentIndex] = React.useState(0);
 
@@ -47,8 +48,8 @@ export default function OnboardingCarousel({ onGetStarted }: { onGetStarted: () 
             <Image source={item.image} style={styles.image} resizeMode="cover" />
             <Text style={styles.headline}>{item.headline}</Text>
             <Text style={styles.subtitle}>{item.subtitle}</Text>
-            <TouchableOpacity style={styles.button} onPress={onGetStarted}>
-              <Text style={styles.buttonText}>Get Started</Text>
+            <TouchableOpacity style={styles.button} onPress={() => router.push('/login')}>
+              <Text style={styles.buttonText}>Login</Text>
             </TouchableOpacity>
           </View>
         )}

@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Text, View } from 'react-native';
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -20,15 +21,15 @@ export default function TabLayout() {
         tabBarBackground: TabBarBackground,
         tabBarStyle: {
           position: 'absolute',
-          left: 16,
-          right: 16,
+          left: wp('4%'),
+          right: wp('4%'),
           borderRadius: 40,
-          height: 80,
+          height: hp('10%'),
           backgroundColor: '#181C20',
           borderTopWidth: 0,
           elevation: 0,
-          marginBottom: 10,
-          padding: 20,
+          marginBottom: hp('2%'),
+          padding: wp('2%'),
         },
         tabBarShowLabel: false,
       }}
@@ -37,9 +38,9 @@ export default function TabLayout() {
         name="index"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 24, paddingHorizontal: focused ? 10 : 0, paddingVertical: focused ? 8 : 0 }}>
-              <IconSymbol size={28} name="house.fill" color={focused ? '#181C20' : '#fff'} />
-              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: 18, marginLeft: 8 }}>Home</Text>}
+            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('2%') : 0, paddingVertical: focused ? hp('1%') : 0, alignItems: 'center' }}>
+              <IconSymbol size={wp('6%')} name="house.fill" color={focused ? '#181C20' : '#fff'} />
+              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: wp('4%'), marginLeft: wp('1%') }}>Home</Text>}
             </View>
           ),
         }}
@@ -48,9 +49,9 @@ export default function TabLayout() {
         name="explore"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 24, paddingHorizontal: focused ? 10 : 0, paddingVertical: focused ? 8 : 0 }}>
-              <IconSymbol size={28} name="paperplane.fill" color={focused ? '#181C20' : '#fff'} />
-              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: 18, marginLeft: 8 }}>Explore</Text>}
+            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('2%') : 0, paddingVertical: focused ? hp('1%') : 0, alignItems: 'center' }}>
+              <IconSymbol size={wp('6%')} name="paperplane.fill" color={focused ? '#181C20' : '#fff'} />
+              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: wp('4%'), marginLeft: wp('1%') }}>Explore</Text>}
             </View>
           ),
         }}
@@ -59,9 +60,9 @@ export default function TabLayout() {
         name="stats"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 24, paddingHorizontal: focused ? 10 : 0, paddingVertical: focused ? 8 : 0 }}>
-              <IconSymbol size={28} name="rectangle.3.offgrid.fill" color={focused ? '#181C20' : '#fff'} />
-              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: 18, marginLeft: 8 }}>Stats</Text>}
+            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('2%') : 0, paddingVertical: focused ? hp('1%') : 0, alignItems: 'center' }}>
+              <IconSymbol size={wp('6%')} name="rectangle.3.offgrid.fill" color={focused ? '#181C20' : '#fff'} />
+              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: wp('4%'), marginLeft: wp('1%') }}>Stats</Text>}
             </View>
           ),
         }}
@@ -70,9 +71,9 @@ export default function TabLayout() {
         name="profile"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 24, paddingHorizontal: focused ? 10 : 0, paddingVertical: focused ? 8 : 0 }}>
-              <IconSymbol size={28} name="person" color={focused ? '#181C20' : '#fff'} />
-              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: 18, marginLeft: 8 }}>Profile</Text>}
+            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('2%') : 0, paddingVertical: focused ? hp('1%') : 0, alignItems: 'center' }}>
+              <IconSymbol size={wp('6%')} name="person" color={focused ? '#181C20' : '#fff'} />
+              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: wp('4%'), marginLeft: wp('1%') }}>Profile</Text>}
             </View>
           ),
         }}
