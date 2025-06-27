@@ -7,9 +7,11 @@ import React, { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import OnboardingCarousel from '@/components/OnboardingCarousel';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
-export default function RootLayout() {
+function AppLayout() {
+  const { user } = useAuth();
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -33,7 +35,7 @@ export default function RootLayout() {
   }
 
   if (showOnboarding) {
-    return <OnboardingCarousel onGetStarted={handleGetStarted} />;
+    return <OnboardingCarousel />;
   }
 
   return (
@@ -44,5 +46,13 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <AppLayout />
+    </AuthProvider>
   );
 }

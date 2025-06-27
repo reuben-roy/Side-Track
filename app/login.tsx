@@ -2,19 +2,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { useAuth } from '@/context/AuthContext';
 
 const LoginScreen = () => {
+  const { login } = useAuth();
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Login</Text>
 
-        <TouchableOpacity style={styles.socialButton}>
+        <TouchableOpacity style={styles.socialButton} onPress={() => login({ username: 'GoogleUser' })}>
           <Ionicons name="logo-google" size={24} color="#fff" />
           <Text style={styles.socialButtonText}>Login with Google</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.socialButton}>
+        <TouchableOpacity style={styles.socialButton} onPress={() => login({ username: 'AppleUser' })}>
           <Ionicons name="logo-apple" size={24} color="#fff" />
           <Text style={styles.socialButtonText}>Login with Apple</Text>
         </TouchableOpacity>
@@ -37,7 +40,7 @@ const LoginScreen = () => {
           secureTextEntry
         />
 
-        <TouchableOpacity style={styles.loginButton}>
+        <TouchableOpacity style={styles.loginButton} onPress={() => login({ username: 'TestUser' })}>
           <Text style={styles.loginButtonText}>Login</Text>
         </TouchableOpacity>
 

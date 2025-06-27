@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import { Button, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '@/context/AuthContext';
 
 const FIELDS = [
   { key: 'weight', label: 'Weight', default: '170 lb' },
@@ -12,6 +13,7 @@ type ProfileKeys = typeof FIELDS[number]['key'];
 type Profile = Record<ProfileKeys, string>;
 
 export default function ProfileScreen() {
+  const { logout } = useAuth();
   const [profile, setProfile] = useState<Profile>({ weight: '', height: '', calorieGoal: '' });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<ProfileKeys | null>(null);
@@ -53,7 +55,7 @@ export default function ProfileScreen() {
     if (editingField === 'height') {
       const feet = heightFeet.replace(/[^0-9]/g, '');
       const inches = heightInches.replace(/[^0-9]/g, '');
-      const formatted = `${feet}'${inches}"`;
+      const formatted = `${feet}'${inches}\"`;
       updated = { ...profile, height: formatted };
     } else {
       updated = { ...profile, [editingField]: inputValue };
@@ -92,6 +94,9 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
       </View>
+      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+        <Text style={styles.logoutButtonText}>Logout</Text>
+      </TouchableOpacity>
       <Modal
         visible={modalVisible}
         transparent
@@ -185,6 +190,19 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#181C20',
+  },
+  logoutButton: {
+    backgroundColor: '#181C20',
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
