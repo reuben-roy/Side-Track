@@ -1,6 +1,8 @@
+import SlotPicker from '@/components/SlotPicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { exercises } from '../../constants/Exercises';
 
 interface WorkoutScreenProps {
   exercise: string;
@@ -9,27 +11,27 @@ interface WorkoutScreenProps {
   onClose: () => void;
 }
 
-const initialSets = [
-  { set: 1, weight: '135', reps: '8' }
-];
-
 export default function WorkoutScreen({ exercise, weight, reps, onClose }: WorkoutScreenProps) {
-  const [sets, setSets] = useState(initialSets);
-  const [timer, setTimer] = useState({ h: '00', m: '00', s: '00' });
-  const [selectedSet, setSelectedSet] = useState(1);
+  // Find the exercise object
+  const exerciseObj = exercises.find(e => e.name === exercise);
+  const weights = exerciseObj ? exerciseObj.weights.map(w => typeof w === 'number' ? `${w} lbs` : w) : [];
+  const repsList = exerciseObj ? exerciseObj.reps.map((r: number) => `${r} reps`) : [];
+
+  // Initial indices based on props
+  const initialWeightIdx = weights.findIndex(w => w === weight);
+  const initialRepsIdx = repsList.findIndex(r => r === reps);
+
+  const [weightIdx, setWeightIdx] = useState(initialWeightIdx >= 0 ? initialWeightIdx : 0);
+  const [repsIdx, setRepsIdx] = useState(initialRepsIdx >= 0 ? initialRepsIdx : 0);
   const [logging, setLogging] = useState(false);
   const [showToast, setShowToast] = useState(false);
-
-  const handleSetChange = (idx: number, field: 'weight' | 'reps', value: string) => {
-    setSets(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
-  };
 
   const logExercise = async () => {
     setLogging(true);
     const workout = {
       exercise,
-      sets,
-      timer,
+      weight: weights[weightIdx],
+      reps: repsList[repsIdx],
       date: new Date().toISOString(),
     };
     try {
@@ -52,56 +54,38 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       <TouchableOpacity style={styles.close} onPress={onClose}>
         <Text style={{ fontSize: 32, color: '#181C20' }}>×</Text>
       </TouchableOpacity>
-      <Text style={styles.header}>Workout</Text>
-      <Text style={styles.sectionTitle}>Exercise</Text>
+      <Text style={styles.header}>Log Workout</Text>
       <Text style={styles.exerciseName}>{exercise}</Text>
-      <Text style={styles.sectionTitle}>Sets</Text>
-      <View style={{ marginBottom: 24 }}>
-        {sets.map((s, i) => (
-          <TouchableOpacity
-            key={s.set}
-            style={[styles.setRow, selectedSet === s.set && styles.setRowSelected]}
-            onPress={() => setSelectedSet(s.set)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.setText, selectedSet === s.set && styles.setTextSelected]}>{s.set}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'center' }}>
-              <TextInput
-                style={[styles.setText, styles.input, selectedSet === s.set && styles.setTextSelected, { flex: 0 }]}
-                value={s.weight}
-                onChangeText={val => handleSetChange(i, 'weight', val.replace(/[^0-9]/g, ''))}
-                keyboardType="numeric"
-                maxLength={4}
-              />
-              <Text style={[styles.setText, { marginLeft: 2, color: '#C2BABA', fontSize: 16 }]}>lbs</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'center' }}>
-              <TextInput
-                style={[styles.setText, styles.input, selectedSet === s.set && styles.setTextSelected, { flex: 0 }]}
-                value={s.reps}
-                onChangeText={val => handleSetChange(i, 'reps', val.replace(/[^0-9]/g, ''))}
-                keyboardType="numeric"
-                maxLength={3}
-              />
-              <Text style={[styles.setText, { marginLeft: 2, color: '#C2BABA', fontSize: 16 }]}>reps</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-      {/* <Text style={styles.sectionTitle}>Timer</Text>
-      <View style={styles.timerRow}>
-        <View style={styles.timerBox}><Text style={styles.timerNum}>{timer.h}</Text><Text style={styles.timerLabel}>Hours</Text></View>
-        <View style={styles.timerBox}><Text style={styles.timerNum}>{timer.m}</Text><Text style={styles.timerLabel}>Minutes</Text></View>
-        <View style={styles.timerBox}><Text style={styles.timerNum}>{timer.s}</Text><Text style={styles.timerLabel}>Seconds</Text></View>
-      </View> */}
       {showToast && (
         <View style={styles.toast}>
           <Text style={styles.toastText}>Workout logged!</Text>
         </View>
       )}
-      <TouchableOpacity style={styles.logButton} onPress={logExercise} disabled={logging}>
-        <Text style={styles.logButtonText}>{logging ? 'Logging...' : 'Log Exercise'}</Text>
-      </TouchableOpacity>
+      <View style={styles.flexBottomContainer}>
+          {/* <Text style={styles.sectionTitle}>Exercise</Text> */}
+          <View style={styles.inlinePickersRow}>
+            <View style={styles.inlinePickerCol}>
+              <Text style={styles.sectionTitle}>Weight</Text>
+              <SlotPicker
+                data={weights}
+                selectedIndex={weightIdx}
+                onSelect={setWeightIdx}
+                style={{}}
+              />
+            </View>
+            <View style={styles.inlinePickerCol}>
+              <Text style={styles.sectionTitle}>Reps</Text>
+              <SlotPicker
+                data={repsList}
+                selectedIndex={repsIdx}
+                onSelect={setRepsIdx}
+              />
+            </View>
+          </View>
+        <TouchableOpacity style={styles.logButton} onPress={logExercise} disabled={logging}>
+          <Text style={styles.logButtonText}>{logging ? 'Logging...' : 'Log Exercise'}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -125,6 +109,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
+    marginTop: 25,
     marginBottom: 24,
     color: '#181C20',
   },
@@ -140,68 +125,13 @@ const styles = StyleSheet.create({
     color: '#C2BABA',
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 16,
-  },
-  setRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderRadius: 32,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  setRowSelected: {
-    backgroundColor: '#F5F2F2',
-  },
-  setText: {
-    flex: 1,
-    fontSize: 18,
-    color: '#C2BABA',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  setTextSelected: {
-    color: '#181C20',
-  },
-  input: {
-    backgroundColor: 'transparent',
-    borderBottomWidth: 1,
-    borderColor: '#ECECEC',
-    textAlign: 'center',
-    fontSize: 18,
-    marginHorizontal: 4,
-    minWidth: 60,
-  },
-  timerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 24,
-  },
-  timerBox: {
-    flex: 1,
-    backgroundColor: '#F5F2F2',
-    borderRadius: 20,
-    alignItems: 'center',
-    marginHorizontal: 6,
-    paddingVertical: 18,
-  },
-  timerNum: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#181C20',
-  },
-  timerLabel: {
-    fontSize: 16,
-    color: '#181C20',
-    marginTop: 4,
   },
   logButton: {
     backgroundColor: '#ED2737',
     borderRadius: 40,
     paddingVertical: 18,
     alignItems: 'center',
-    marginTop: 32,
+    marginTop: 8,
   },
   logButtonText: {
     color: '#fff',
@@ -212,7 +142,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 120,
+    top: 60,
     backgroundColor: '#181C20',
     padding: 16,
     borderRadius: 16,
@@ -225,5 +155,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  flexBottomContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  inlinePickersRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 16,
+    marginTop: 16,
+  },
+  inlinePickerCol: {
+    flex: 1,
+    alignItems: 'center',
   },
 }); 

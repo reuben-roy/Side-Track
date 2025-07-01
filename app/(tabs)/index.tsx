@@ -1,48 +1,16 @@
 import ProfileButton from '@/components/ProfileButton';
 import React, { useRef, useState } from 'react';
-import { Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { exercises } from '../../constants/Exercises';
 import WorkoutScreen from './WorkoutScreen';
 
 const ITEM_HEIGHT = 48;
+const ITEM_MARGIN = 12; // Space between items
+const ITEM_TOTAL_HEIGHT = ITEM_HEIGHT + ITEM_MARGIN;
+const VISIBLE_ITEMS = 5; // Show 5 items like native pickers
 const { width } = Dimensions.get('window');
 
 const EXERCISES = exercises.map(e => e.name);
-
-function SlotPicker({ data, selectedIndex, onSelect }: { data: string[]; selectedIndex: number; onSelect: (i: number) => void }) {
-  const flatListRef = useRef<FlatList>(null);
-
-  React.useEffect(() => {
-    flatListRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
-  }, [selectedIndex]);
-
-  const handleMomentumScrollEnd = (e: any) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
-    onSelect(idx);
-  };
-
-  return (
-    <FlatList
-      ref={flatListRef}
-      data={data}
-      keyExtractor={item => item}
-      showsVerticalScrollIndicator={false}
-      style={{ height: ITEM_HEIGHT * 3 }}
-      contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}
-      snapToInterval={ITEM_HEIGHT}
-      decelerationRate="fast"
-      bounces={false}
-      renderItem={({ item, index }) => (
-        <View style={[styles.slotItem, selectedIndex === index && styles.slotItemSelected]}>
-          <Text style={[styles.slotText, selectedIndex === index && styles.slotTextSelected]}>{item}</Text>
-        </View>
-      )}
-      getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
-      onMomentumScrollEnd={handleMomentumScrollEnd}
-      scrollEventThrottle={16}
-    />
-  );
-}
 
 export default function HomeScreen() {
   const [exerciseIdx, setExerciseIdx] = useState(0);
@@ -64,6 +32,7 @@ export default function HomeScreen() {
     setExerciseIdx(newExerciseIdx);
     setWeightIdx(Math.floor(Math.random() * exercises[newExerciseIdx].weights.length));
     setRepsIdx(Math.floor(Math.random() * exercises[newExerciseIdx].reps.length));
+    setShowWorkout(true);
   };
 
   if (showWorkout) {
@@ -93,12 +62,126 @@ export default function HomeScreen() {
           <SlotPicker data={REPS} selectedIndex={repsIdx} onSelect={setRepsIdx} />
         </View>
       </View>
-      <TouchableOpacity style={styles.spinButton} onPress={spin}>
-        <Text style={styles.spinButtonText}>Spin</Text>
-      </TouchableOpacity>
       <TouchableOpacity style={styles.pickButton} onPress={() => setShowWorkout(true)}>
         <Text style={styles.pickButtonText}>Pick Exercise</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.spinButton} onPress={spin}>
+        <Text style={styles.spinButtonText}>Pick For Me</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function SlotPicker({
+  data,
+  selectedIndex,
+  onSelect,
+  style,
+}: {
+  data: string[];
+  selectedIndex: number;
+  onSelect: (i: number) => void;
+  style?: ViewStyle;
+}) {
+  const flatListRef = useRef<FlatList>(null);
+  const scrollY = useRef(new Animated.Value(selectedIndex * ITEM_TOTAL_HEIGHT)).current;
+  const lastIndexRef = useRef(selectedIndex);
+
+  React.useEffect(() => {
+    flatListRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
+    lastIndexRef.current = selectedIndex;
+  }, [selectedIndex]);
+
+  // Helper to get the current index from scroll offset
+  const getCurrentIndex = (offset: number) => {
+    return Math.round(offset / ITEM_TOTAL_HEIGHT);
+  };
+
+  // Update parent every time the highlighted item changes
+  const handleScroll = (e: any) => {
+    const offsetY = e.nativeEvent.contentOffset.y;
+    const idx = getCurrentIndex(offsetY);
+    if (idx !== lastIndexRef.current && idx >= 0 && idx < data.length) {
+      lastIndexRef.current = idx;
+      onSelect(idx);
+    }
+  };
+
+  return (
+    <View style={[{ height: ITEM_TOTAL_HEIGHT * VISIBLE_ITEMS, position: 'relative' }, style]}>
+      <Animated.FlatList
+        ref={flatListRef}
+        data={data}
+        keyExtractor={item => item}
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingVertical: ITEM_TOTAL_HEIGHT * Math.floor(VISIBLE_ITEMS / 2),
+        }}
+        snapToInterval={ITEM_TOTAL_HEIGHT}
+        decelerationRate="fast"
+        bounces={false}
+        getItemLayout={(_, index) => ({
+          length: ITEM_TOTAL_HEIGHT,
+          offset: ITEM_TOTAL_HEIGHT * index,
+          index,
+        })}
+        onMomentumScrollEnd={handleScroll}
+        onScrollEndDrag={handleScroll}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true, listener: handleScroll }
+        )}
+        scrollEventThrottle={16}
+        renderItem={({ item, index }) => {
+          // Animate scale/opacity based on distance from center
+          const inputRange = [
+            (index - 2) * ITEM_TOTAL_HEIGHT,
+            (index - 1) * ITEM_TOTAL_HEIGHT,
+            index * ITEM_TOTAL_HEIGHT,
+            (index + 1) * ITEM_TOTAL_HEIGHT,
+            (index + 2) * ITEM_TOTAL_HEIGHT,
+          ];
+          const scale = scrollY.interpolate({
+            inputRange,
+            outputRange: [0.8, 0.9, 1, 0.9, 0.8],
+            extrapolate: 'clamp',
+          });
+          const opacity = scrollY.interpolate({
+            inputRange,
+            outputRange: [0.3, 0.6, 1, 0.6, 0.3],
+            extrapolate: 'clamp',
+          });
+
+          return (
+            <Animated.View style={[styles.slotItem, { marginBottom: ITEM_MARGIN, transform: [{ scale }], opacity }]}>
+              <Text style={styles.slotText}>{item}</Text>
+            </Animated.View>
+          );
+        }}
+      />
+      {/* Center highlight overlay */}
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
+        ]}
+      >
+        <View
+          style={{
+            height: ITEM_HEIGHT,
+            width: '100%',
+            borderRadius: 8,
+            borderWidth: 2,
+            borderColor: '#E6B3B3',
+            backgroundColor: 'rgba(255,255,255,0.2)',
+          }}
+        />
+      </View>
     </View>
   );
 }
@@ -121,7 +204,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#181C20',
-    // textAlign: 'center',
     marginBottom: 32,
     marginTop:32,
     left: 20,
@@ -145,21 +227,12 @@ const styles = StyleSheet.create({
     height: ITEM_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
-    opacity: 0.4,
-  },
-  slotItemSelected: {
-    backgroundColor: '#F5F2F2',
-    opacity: 1,
   },
   slotText: {
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#C2BABA',
-  },
-  slotTextSelected: {
     color: '#181C20',
-    fontWeight: 'bold',
-    fontSize: 22,
+    textAlign: 'center',
   },
   spinButton: {
     backgroundColor: '#E6B3B3',
@@ -170,7 +243,7 @@ const styles = StyleSheet.create({
   },
   spinButtonText: {
     color: '#181C20',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -182,7 +255,7 @@ const styles = StyleSheet.create({
   },
   pickButtonText: {
     color: '#181C20',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'center',
   },
