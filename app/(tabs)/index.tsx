@@ -80,6 +80,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ProfileButton />
+      <Text style={styles.header}>Workout</Text>
       <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
       <View style={styles.slotRow}>
         <View style={styles.slotCol}>
@@ -107,27 +108,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFF',
     paddingTop: 32,
-    alignItems: 'center',
   },
   header: {
     fontSize: 28,
     fontWeight: 'bold',
-    marginTop: 16,
+    marginTop: 25,
     marginBottom: 24,
     color: '#181C20',
-    textAlign: 'center',
+    left: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#181C20',
-    textAlign: 'center',
+    // textAlign: 'center',
     marginBottom: 32,
+    marginTop:32,
+    left: 20,
   },
   slotRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
     width: width - 32,
     alignSelf: 'center',
   },
@@ -162,11 +164,9 @@ const styles = StyleSheet.create({
   spinButton: {
     backgroundColor: '#E6B3B3',
     borderRadius: 40,
-    paddingVertical: 18,
-    paddingHorizontal: 80,
-    marginTop: 8,
-    marginBottom: 12,
-    width: '100%',
+    paddingVertical: 16,
+    marginHorizontal: 20,
+    marginVertical: 8,
   },
   spinButtonText: {
     color: '#181C20',
@@ -177,10 +177,8 @@ const styles = StyleSheet.create({
   pickButton: {
     backgroundColor: '#F5F2F2',
     borderRadius: 40,
-    paddingVertical: 18,
-    paddingHorizontal: 60,
-    marginBottom: 24,
-    minWidth: 275,
+    paddingVertical: 16,
+    marginHorizontal: 20,
   },
   pickButtonText: {
     color: '#181C20',
