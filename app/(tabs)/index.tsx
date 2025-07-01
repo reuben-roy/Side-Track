@@ -80,7 +80,6 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ProfileButton />
-      <Text style={styles.header}>Workout Generator</Text>
       <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
       <View style={styles.slotRow}>
         <View style={styles.slotCol}>
@@ -167,6 +166,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 80,
     marginTop: 8,
     marginBottom: 12,
+    width: '100%',
   },
   spinButtonText: {
     color: '#181C20',
@@ -180,6 +180,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 60,
     marginBottom: 24,
+    minWidth: 275,
   },
   pickButtonText: {
     color: '#181C20',
