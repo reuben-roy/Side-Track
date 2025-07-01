@@ -1,3 +1,4 @@
+import ProfileButton from '@/components/ProfileButton';
 import React, { useRef, useState } from 'react';
 import { Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { exercises } from '../../constants/Exercises';
@@ -78,9 +79,9 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <ProfileButton />
       <Text style={styles.header}>Workout Generator</Text>
-      <Text style={styles.title}>Spin the wheel to pick{
-}your workout!</Text>
+      <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
       <View style={styles.slotRow}>
         <View style={styles.slotCol}>
           <SlotPicker data={EXERCISES} selectedIndex={exerciseIdx} onSelect={setExerciseIdx} />

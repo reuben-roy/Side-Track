@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
+import ProfileButton from '../../components/ProfileButton';
 import { exercises } from '../../constants/Exercises';
 
 interface WorkoutLog {
@@ -245,6 +246,7 @@ export default function StatsScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      <ProfileButton />
       <Text style={styles.text}>Stats</Text>
       
       <View style={styles.caloriesSection}>
@@ -294,7 +296,7 @@ export default function StatsScreen() {
           <Text style={styles.streakValue}>Current: {streak.current} days</Text>
           <Text style={styles.streakValue}>Best: {streak.best} days</Text>
         </View>
-        <View style_="styles.goalRow">
+        <View style={styles.goalRow}>
           <Text style={styles.goalLabel}>🎯 Calorie Goal Progress (Week):</Text>
           <View style={styles.progressBarBg}>
             <View style={[styles.progressBar, { width: `${Math.min(goalProgress.week, 100)}%` }]} />

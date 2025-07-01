@@ -10,28 +10,48 @@ const slides = [
     image: require('@/assets/images/react-logo.png'),
     headline: 'Wherever You Are, Health Is Number One',
     subtitle: 'There is no instant way to a healthy life',
+    isLastSlide: false,
   },
   {
     key: 'slide2',
     image: require('@/assets/images/onboarding-bg.jpg'),
     headline: 'Track Your Progress',
     subtitle: 'Monitor your workouts and achievements',
+    isLastSlide: false,
   },
   {
     key: 'slide3',
     image: require('@/assets/images/onboarding-bg.jpg'),
     headline: 'Join the Community',
     subtitle: 'Connect with others on your fitness journey',
+    isLastSlide: true,
   },
 ];
 
-export default function OnboardingCarousel() {
+interface OnboardingCarouselProps {
+  onComplete?: () => void;
+}
+
+export default function OnboardingCarousel({ onComplete }: OnboardingCarouselProps) {
   const flatListRef = useRef<FlatList>(null);
   const [currentIndex, setCurrentIndex] = React.useState(0);
 
   const handleScroll = (event: any) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / width);
     setCurrentIndex(index);
+  };
+
+  const handleLoginPress = () => {
+    router.push('/login');
+  };
+
+  const handleGetStartedPress = async () => {
+    if (onComplete) {
+      onComplete();
+    } else {
+      // If no onComplete prop, navigate to main app
+      router.replace('/(tabs)');
+    }
   };
 
   return (
@@ -48,9 +68,20 @@ export default function OnboardingCarousel() {
             <Image source={item.image} style={styles.image} resizeMode="cover" />
             <Text style={styles.headline}>{item.headline}</Text>
             <Text style={styles.subtitle}>{item.subtitle}</Text>
-            <TouchableOpacity style={styles.button} onPress={() => router.push('/login')}>
-              <Text style={styles.buttonText}>Login</Text>
-            </TouchableOpacity>
+            {item.isLastSlide ? (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity style={styles.button} onPress={handleGetStartedPress}>
+                  <Text style={styles.buttonText}>Get Started</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryButton} onPress={handleLoginPress}>
+                  <Text style={styles.secondaryButtonText}>Login</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.button} onPress={handleLoginPress}>
+                <Text style={styles.buttonText}>Login</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
         keyExtractor={item => item.key}
@@ -126,5 +157,23 @@ const styles = StyleSheet.create({
   activeDot: {
     backgroundColor: '#B6F533',
     width: 24,
+  },
+  buttonContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 12,
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#181C20',
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+  },
+  secondaryButtonText: {
+    color: '#181C20',
+    fontSize: 18,
+    fontWeight: '600',
   },
 }); 

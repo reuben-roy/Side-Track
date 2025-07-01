@@ -1,23 +1,23 @@
+import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
-import { useAuth } from '@/context/AuthContext';
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const LoginScreen = () => {
-  const { login } = useAuth();
+  const { loginWithGoogle, loginWithApple } = useAuth()!;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Login</Text>
 
-        <TouchableOpacity style={styles.socialButton} onPress={() => login({ username: 'GoogleUser' })}>
+        <TouchableOpacity style={styles.socialButton} onPress={loginWithGoogle}>
           <Ionicons name="logo-google" size={24} color="#fff" />
           <Text style={styles.socialButtonText}>Login with Google</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.socialButton} onPress={() => login({ username: 'AppleUser' })}>
+        <TouchableOpacity style={styles.socialButton} onPress={loginWithApple}>
           <Ionicons name="logo-apple" size={24} color="#fff" />
           <Text style={styles.socialButtonText}>Login with Apple</Text>
         </TouchableOpacity>
@@ -27,22 +27,6 @@ const LoginScreen = () => {
           <Text style={styles.orText}>OR</Text>
           <View style={styles.line} />
         </View>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Username"
-          placeholderTextColor="#888"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#888"
-          secureTextEntry
-        />
-
-        <TouchableOpacity style={styles.loginButton} onPress={() => login({ username: 'TestUser' })}>
-          <Text style={styles.loginButtonText}>Login</Text>
-        </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push('/signup')}>
           <Text style={styles.signupText}>Don't have an account? Sign Up</Text>
@@ -98,27 +82,6 @@ const styles = StyleSheet.create({
   orText: {
     color: '#888',
     marginHorizontal: 12,
-  },
-  input: {
-    backgroundColor: '#333',
-    borderRadius: 12,
-    padding: 16,
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  loginButton: {
-    backgroundColor: '#B6F533',
-    borderRadius: 24,
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  loginButtonText: {
-    color: '#181C20',
-    fontSize: 18,
-    fontWeight: '600',
   },
   signupText: {
     color: '#B6F533',

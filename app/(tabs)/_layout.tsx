@@ -67,17 +67,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          tabBarIcon: ({ color, focused }) => (
-            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('2%') : 0, paddingVertical: focused ? hp('1%') : 0, alignItems: 'center' }}>
-              <IconSymbol size={wp('6%')} name="person" color={focused ? '#181C20' : '#fff'} />
-              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: wp('4%'), marginLeft: wp('1%') }}>Profile</Text>}
-            </View>
-          ),
-        }}
-      />
     </Tabs>
   );
 }

@@ -6,12 +6,10 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
-import OnboardingCarousel from '@/components/OnboardingCarousel';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 function AppLayout() {
-  const { user } = useAuth();
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -25,23 +23,32 @@ function AppLayout() {
     })();
   }, []);
 
-  const handleGetStarted = async () => {
-    await AsyncStorage.setItem('onboardingComplete', 'true');
-    setShowOnboarding(false);
-  };
-
   if (!loaded || showOnboarding === null) {
     return null;
-  }
-
-  if (showOnboarding) {
-    return <OnboardingCarousel />;
   }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {showOnboarding ? (
+          <>
+            <Stack.Screen 
+              name="onboarding" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: false 
+              }} 
+            />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="signup" options={{ headerShown: false }} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="signup" options={{ headerShown: false }} />
+          </>
+        )}
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
