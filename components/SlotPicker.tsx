@@ -19,11 +19,12 @@ export default function SlotPicker({
   style?: ViewStyle;
 }) {
   const flatListRef = useRef<FlatList>(null);
-  const scrollY = React.useRef(new Animated.Value(selectedIndex * ITEM_TOTAL_HEIGHT)).current;
+  const scrollY = useRef(new Animated.Value(0)).current;
   const lastIndexRef = useRef(selectedIndex);
 
   React.useEffect(() => {
     flatListRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
+    scrollY.setValue(selectedIndex * ITEM_TOTAL_HEIGHT);
     lastIndexRef.current = selectedIndex;
   }, [selectedIndex]);
 
@@ -45,7 +46,7 @@ export default function SlotPicker({
       <Animated.FlatList
         ref={flatListRef}
         data={data}
-        keyExtractor={item => item}
+        keyExtractor={(item, index) => index.toString()}
         showsVerticalScrollIndicator={false}
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -85,7 +86,9 @@ export default function SlotPicker({
           });
 
           return (
-            <Animated.View style={[styles.slotItem, { marginBottom: ITEM_MARGIN, transform: [{ scale }], opacity }]}>              <Text style={styles.slotText}>{item}</Text>            </Animated.View>
+            <Animated.View style={[styles.slotItem, { marginBottom: ITEM_MARGIN, transform: [{ scale }], opacity }]}>
+              <Text style={styles.slotText}>{item}</Text>
+            </Animated.View>
           );
         }}
       />
