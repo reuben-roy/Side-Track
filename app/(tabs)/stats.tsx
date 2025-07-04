@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import ProfileButton from '../../components/ProfileButton';
 import { exercises } from '../../constants/Exercises';
@@ -51,6 +51,19 @@ function getWeekDays(start: Date) {
   return days;
 }
 
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function getMonthDays(year: number, month: number) {
+  const days = [];
+  const total = getDaysInMonth(year, month);
+  for (let i = 1; i <= total; i++) {
+    days.push(new Date(year, month, i));
+  }
+  return days;
+}
+
 export default function StatsScreen() {
   const [calories, setCalories] = useState<number | null>(null);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
@@ -61,6 +74,62 @@ export default function StatsScreen() {
   const [monthlyTotals, setMonthlyTotals] = useState({ workouts: 0, calories: 0, sets: 0, reps: 0 });
   const [allTimeTotals, setAllTimeTotals] = useState({ workouts: 0, calories: 0, sets: 0, reps: 0 });
   const [goalProgress, setGoalProgress] = useState({ week: 0, month: 0 });
+  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('week');
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const monthDays = getMonthDays(currentYear, currentMonth);
+  // Map: YYYY-MM-DD -> calories
+  const caloriesPerDay: { [date: string]: number } = {};
+  workoutLogs.forEach(log => {
+    const d = new Date(log.date);
+    if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+      const key = d.toISOString().slice(0, 10);
+      const met = getExerciseMET(log.exercise);
+      let durationMin = 0;
+      if (log.timer && (log.timer.h !== '00' || log.timer.m !== '00' || log.timer.s !== '00')) {
+        durationMin = (parseInt(log.timer.h) || 0) * 60 + (parseInt(log.timer.m) || 0) + ((parseInt(log.timer.s) || 0) / 60);
+      } else {
+        durationMin = (log.sets?.length || 1) * 2;
+      }
+      const weightLbs = parseWeight(profile.weight || '170');
+      const weightKg = weightLbs * 0.453592;
+      const cals = (met * weightKg * 3.5 / 200) * durationMin;
+      caloriesPerDay[key] = (caloriesPerDay[key] || 0) + Math.round(cals);
+    }
+  });
+  // Find max calories in month for scaling
+  const maxCals = Math.max(...Object.values(caloriesPerDay), 1);
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const caloriesPerMonth: { [month: string]: number } = {};
+  for (let i = 0; i < 12; i++) {
+    caloriesPerMonth[months[i]] = 0;
+  }
+  workoutLogs.forEach(log => {
+    const d = new Date(log.date);
+    if (d.getFullYear() === currentYear) {
+      const met = getExerciseMET(log.exercise);
+      let durationMin = 0;
+      if (log.timer && (log.timer.h !== '00' || log.timer.m !== '00' || log.timer.s !== '00')) {
+        durationMin = (parseInt(log.timer.h) || 0) * 60 + (parseInt(log.timer.m) || 0) + ((parseInt(log.timer.s) || 0) / 60);
+      } else {
+        durationMin = (log.sets?.length || 1) * 2;
+      }
+      const weightLbs = parseWeight(profile.weight || '170');
+      const weightKg = weightLbs * 0.453592;
+      const cals = (met * weightKg * 3.5 / 200) * durationMin;
+      const monthName = months[d.getMonth()];
+      caloriesPerMonth[monthName] = (caloriesPerMonth[monthName] || 0) + Math.round(cals);
+    }
+  });
+  const yearBarData = months.map((month: string) => ({
+    value: caloriesPerMonth[month] || 0,
+    label: month,
+    frontColor: '#ED2737',
+    gradientColor: '#F5F2F2',
+  }));
 
   useEffect(() => {
     async function fetchStats() {
@@ -170,7 +239,7 @@ export default function StatsScreen() {
       const bests: { [exercise: string]: { maxWeight: number; maxReps: number } } = {};
       logs.forEach(log => {
         if (!bests[log.exercise]) bests[log.exercise] = { maxWeight: 0, maxReps: 0 };
-        log.sets.forEach(set => {
+        (log.sets || []).forEach(set => {
           const weight = parseInt(set.weight);
           const reps = parseInt(set.reps);
           if (!isNaN(weight) && weight > bests[log.exercise].maxWeight) bests[log.exercise].maxWeight = weight;
@@ -190,17 +259,17 @@ export default function StatsScreen() {
         if (log.timer && (log.timer.h !== '00' || log.timer.m !== '00' || log.timer.s !== '00')) {
           durationMin = (parseInt(log.timer.h) || 0) * 60 + (parseInt(log.timer.m) || 0) + ((parseInt(log.timer.s) || 0) / 60);
         } else {
-          durationMin = (log.sets?.length || 1) * 2;
+          durationMin = ((log.sets || []).length || 1) * 2;
         }
         const cals = (met * weightKg * 3.5 / 200) * durationMin;
         allCalories += cals;
-        allSets += log.sets.length;
-        allReps += log.sets.reduce((sum, s) => sum + parseInt(s.reps), 0);
+        allSets += (log.sets || []).length;
+        allReps += (log.sets || []).reduce((sum, s) => sum + parseInt(s.reps), 0);
         if (logDate.getMonth() === nowMonth && logDate.getFullYear() === nowYear) {
           monthWorkouts++;
           monthCalories += cals;
-          monthSets += log.sets.length;
-          monthReps += log.sets.reduce((sum, s) => sum + parseInt(s.reps), 0);
+          monthSets += (log.sets || []).length;
+          monthReps += (log.sets || []).reduce((sum, s) => sum + parseInt(s.reps), 0);
         }
       });
       setMonthlyTotals({ workouts: monthWorkouts, calories: Math.round(monthCalories), sets: monthSets, reps: monthReps });
@@ -236,13 +305,31 @@ export default function StatsScreen() {
     frontColor: '#ED2737',
     gradientColor: '#F5F2F2',
   }));
-  // Prepare line data for trend line
-  const lineData = weekOrder.map((day, idx) => ({
-    value: weeklyCalories[day] || 0,
-    dataPointText: `${weeklyCalories[day] || 0}`,
-    label: day,
-    // Optionally, you can add custom color or marker
-  }));
+
+  const screenWidth = Dimensions.get('window').width;
+  console.log(screenWidth)
+  const barWidth = 30;
+  const initialSpacing = 10;
+  const totalHorizontalPadding = 64;
+  const spacing = (screenWidth - totalHorizontalPadding * 2 - (barWidth * 7) - initialSpacing) / 7;
+  const yearBarInitialSpacing = 5;
+  const yearBarWidth = ((screenWidth - totalHorizontalPadding * 2 - yearBarInitialSpacing) * 4) / (5 * 12);
+  const yearBarSpacing = (screenWidth - totalHorizontalPadding * 2 - (yearBarWidth * 12) - yearBarInitialSpacing) / 11;
+
+  const buttonCount = 3;
+  const minButtonWidth = 60; // Minimum width for each button's content
+  const periodButtonHorizontalPadding = Math.max(10, (screenWidth - totalHorizontalPadding *3 - 2*6) / (buttonCount * 2));
+
+  // Dynamic style for periodButton
+  function getPeriodButtonStyle(paddingHorizontal: number) {
+    return {
+      paddingVertical: 6,
+      paddingHorizontal,
+      borderRadius: 10,
+      backgroundColor: '#ECECEC',
+      marginHorizontal: 2,
+    };
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -254,38 +341,95 @@ export default function StatsScreen() {
         <Text style={styles.calories}>{calories !== null ? calories + ' kcal' : '...'}</Text>
       </View>
 
+        {/* Inline period selector buttons */}
+        <View style={styles.periodSelectorRow}>
+          {['week', 'month', 'year'].map(period => (
+            <TouchableOpacity
+              key={period}
+              style={[getPeriodButtonStyle(periodButtonHorizontalPadding), selectedPeriod === period && styles.periodButtonSelected]}
+              onPress={() => setSelectedPeriod(period as 'week' | 'month' | 'year')}
+            >
+              <Text style={[styles.periodButtonText, selectedPeriod === period && styles.periodButtonTextSelected]}>
+                {period.charAt(0).toUpperCase() + period.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
       {/* Weekly Calories Bar Chart */}
       <View style={styles.chartSection}>
-        <Text style={styles.sectionTitle}>Calories Burned This Week</Text>
-        <BarChart
-          data={barData}
-          barWidth={28}
-          initialSpacing={16}
-          spacing={18}
-          barBorderRadius={8}
-          showGradient
-          yAxisThickness={0}
-          xAxisType={'dashed'}
-          xAxisColor={'#ECECEC'}
-          yAxisTextStyle={{ color: '#C2BABA' }}
-          maxValue={Math.max(...barData.map(b => b.value), 100)}
-          noOfSections={4}
-          xAxisLabelTextStyle={{ color: '#C2BABA', textAlign: 'center', fontWeight: 'bold' }}
-          showLine={true}
-          lineData={lineData}
-          lineConfig={{
-            color: '#232B5D',
-            thickness: 3,
-            curved: true,
-            hideDataPoints: false,
-            dataPointsColor: '#B6F533',
-            dataPointsRadius: 5,
-            shiftY: 0,
-            initialSpacing: 0,
-          }}
-          height={180}
-          disableScroll
-        />
+        <Text style={styles.sectionTitle}>
+          {selectedPeriod === 'week' ? 'Calories Burned This Week' : selectedPeriod === 'month' ? 'Calories Burned This Month' : 'Calories Burned This Year'}
+        </Text>
+        {selectedPeriod === 'week' && (
+          <BarChart
+            data={barData}
+            barWidth={30}
+            initialSpacing={initialSpacing}
+            spacing={spacing}
+            barBorderRadius={8}
+            showGradient
+            yAxisThickness={0}
+            xAxisType={'dashed'}
+            xAxisColor={'#ECECEC'}
+            yAxisTextStyle={{ color: '#C2BABA' }}
+            maxValue={Math.max(...barData.map(b => b.value), 100)}
+            noOfSections={4}
+            xAxisLabelTextStyle={{ color: '#C2BABA', textAlign: 'center', fontWeight: 'bold' }}
+            height={180}
+            disableScroll
+          />
+        )}
+        {selectedPeriod === 'month' && (
+          <View style={styles.calendarGrid}>
+            {/* Render days of week header */}
+            <View style={styles.calendarHeaderRow}>
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                <Text key={d} style={styles.calendarHeaderText}>{d}</Text>
+              ))}
+            </View>
+            {/* Render calendar days */}
+            <View style={styles.calendarDaysGrid}>
+              {/* Add empty slots for first day of month */}
+              {Array(monthDays[0].getDay()).fill(null).map((_, i) => (
+                <View key={'empty-' + i} style={styles.calendarDayCell} />
+              ))}
+              {monthDays.map((date: Date, idx: number) => {
+                const key = date.toISOString().slice(0, 10);
+                const cals = caloriesPerDay[key] || 0;
+                // Circle radius: min 10, max 28
+                const minR = 10, maxR = 28;
+                const r = cals === 0 ? minR : minR + ((maxR - minR) * cals) / maxCals;
+                return (
+                  <View key={key} style={styles.calendarDayCell}>
+                    <View style={[styles.calendarCircle, { width: r * 2, height: r * 2, borderRadius: r, backgroundColor: cals > 0 ? '#ED2737' : '#ECECEC' }]}/>
+                    <Text style={styles.calendarDayText}>{date.getDate()}</Text>
+                    {cals > 0 && <Text style={styles.calendarCalsText}>{cals}</Text>}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+        {selectedPeriod === 'year' && (
+          <BarChart
+            data={yearBarData}
+            barWidth={yearBarWidth}
+            initialSpacing={yearBarInitialSpacing}
+            spacing={yearBarSpacing}
+            barBorderRadius={5}
+            showGradient
+            yAxisThickness={0}
+            xAxisType={'dashed'}
+            xAxisColor={'#ECECEC'}
+            yAxisTextStyle={{ color: '#C2BABA' }}
+            maxValue={Math.max(...yearBarData.map((b: any) => b.value), 100)}
+            noOfSections={4}
+            xAxisLabelTextStyle={{ color: '#C2BABA', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}
+            height={180}
+            disableScroll
+          />
+        )}
       </View>
 
 
@@ -350,7 +494,7 @@ export default function StatsScreen() {
                 <Text style={styles.workoutDate}>{formatDate(log.date)}</Text>
               </View>
               <View style={styles.setsContainer}>
-                {log.sets.map((set, setIndex) => (
+                {(log.sets || []).map((set, setIndex) => (
                   <Text key={setIndex} style={styles.setText}>
                     Set {set.set}: {set.weight} lbs × {set.reps} reps
                   </Text>
@@ -374,8 +518,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#181C20',
+    marginTop: 25,
     marginBottom: 24,
-    textAlign: 'center',
+    left: 20,
   },
   caloriesSection: {
     alignItems: 'center',
@@ -550,5 +695,64 @@ const styles = StyleSheet.create({
   bestsValue: {
     fontSize: 15,
     color: '#181C20',
+  },
+  periodSelectorRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  periodButtonSelected: {
+    backgroundColor: '#ED2737',
+  },
+  periodButtonText: {
+    color: '#181C20',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  periodButtonTextSelected: {
+    color: '#fff',
+  },
+  calendarGrid: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  calendarHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  calendarHeaderText: {
+    flex: 1,
+    textAlign: 'center',
+    fontWeight: 'bold',
+    color: '#232B5D',
+    fontSize: 15,
+  },
+  calendarDaysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calendarDayCell: {
+    width: `${100 / 7}%`,
+    alignItems: 'center',
+    marginVertical: 4,
+    minHeight: 48,
+  },
+  calendarCircle: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  calendarDayText: {
+    fontSize: 13,
+    color: '#181C20',
+    fontWeight: 'bold',
+  },
+  calendarCalsText: {
+    fontSize: 11,
+    color: '#ED2737',
+    fontWeight: 'bold',
   },
 });
