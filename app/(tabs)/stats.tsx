@@ -307,7 +307,6 @@ export default function StatsScreen() {
   }));
 
   const screenWidth = Dimensions.get('window').width;
-  console.log(screenWidth)
   const barWidth = 30;
   const initialSpacing = 10;
   const totalHorizontalPadding = 64;
@@ -333,14 +332,8 @@ export default function StatsScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <ProfileButton />
+      <ProfileButton top={18} right={0} />
       <Text style={styles.text}>Stats</Text>
-      
-      <View style={styles.caloriesSection}>
-        <Text style={styles.label}>Total Calories Burned:</Text>
-        <Text style={styles.calories}>{calories !== null ? calories + ' kcal' : '...'}</Text>
-      </View>
-
         {/* Inline period selector buttons */}
         <View style={styles.periodSelectorRow}>
           {['week', 'month', 'year'].map(period => (
@@ -437,7 +430,7 @@ export default function StatsScreen() {
       <View style={styles.statsSummaryGrid}>
         {/* Week Goal Progress */}
         <View style={styles.statsSummaryBox}>
-          <Text style={[styles.goalLabel, {color: '#B6F533'}]}>🎯 Week</Text>
+          <Text style={[styles.goalLabel, {color: '#B6F533'}]}>Week</Text>
           <View style={styles.progressBarBgSmall}>
             <View style={[styles.progressBar, { width: `${Math.min(goalProgress.week, 100)}%` }]} />
           </View>
@@ -450,6 +443,10 @@ export default function StatsScreen() {
             <View style={[styles.progressBar, { width: `${Math.min(goalProgress.month, 100)}%` }]} />
           </View>
           <Text style={styles.goalValue}>{goalProgress.month}%</Text>
+        </View>
+        <View style={styles.statsSummaryBox}>
+          <Text style={styles.totalsLabel}>Total Calories Burned:</Text>
+          <Text style={styles.calories}>{calories !== null ? calories + ' kcal' : '...'}</Text>
         </View>
         {/* Streak */}
         <View style={styles.statsSummaryBox}>
@@ -518,7 +515,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FAFAFF',
-    padding: 20,
+    paddingTop: 32,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   text: {
     fontSize: 28,
@@ -526,19 +525,6 @@ const styles = StyleSheet.create({
     color: '#181C20',
     marginTop: 25,
     marginBottom: 24,
-    left: 20,
-  },
-  caloriesSection: {
-    alignItems: 'center',
-    marginBottom: 32,
-    padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   chartSection: {
     backgroundColor: '#fff',
@@ -557,9 +543,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   calories: {
-    fontSize: 32,
     fontWeight: 'bold',
     color: '#ED2737',
+    // textAlign: 'right',
   },
   historySection: {
     flex: 1,

@@ -48,7 +48,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <ProfileButton />
+      <ProfileButton top={50} right={20} />
       <Text style={styles.header}>Workout</Text>
       <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
       <View style={styles.slotRow}>

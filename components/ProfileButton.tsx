@@ -38,7 +38,12 @@ const calculateBMI = (weight: string, height: string): string => {
   }
 };
 
-export default function ProfileButton() {
+interface ProfileButtonProps {
+  top?: number;
+  right?: number;
+}
+
+export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonProps) {
   const auth = useAuth();
   const user = auth?.user;
   const logout = auth?.logout;
@@ -102,7 +107,7 @@ export default function ProfileButton() {
 
   return (
     <>
-      <TouchableOpacity style={styles.profileButton} onPress={() => setModalVisible(true)}>
+      <TouchableOpacity style={[styles.profileButton, { top, right }]} onPress={() => setModalVisible(true)}>
         {user?.photoUrl ? (
           <Image source={{ uri: user.photoUrl }} style={styles.profileImage} />
         ) : (
@@ -221,8 +226,6 @@ export default function ProfileButton() {
 const styles = StyleSheet.create({
   profileButton: {
     position: 'absolute',
-    top: 50,
-    right: 20,
     zIndex: 1000,
   },
   profileImage: {

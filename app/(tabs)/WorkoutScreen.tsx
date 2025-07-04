@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   close: {
     position: 'absolute',
     left: 24,
-    top: 32,
+    top: 50,
     zIndex: 10,
   },
   header: {
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginTop: 25,
-    marginBottom: 24,
+    marginBottom: 5,
     color: '#181C20',
   },
   sectionTitle: {
