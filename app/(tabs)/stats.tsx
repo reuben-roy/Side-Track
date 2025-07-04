@@ -292,7 +292,7 @@ export default function StatsScreen() {
         if (logDate >= startOfWeekForGoal) weekCals += cals;
         if (logDate.getMonth() === nowMonth && logDate.getFullYear() === nowYear) monthCals += cals;
       });
-      setGoalProgress({ week: Math.round((weekCals / calorieGoal) * 100), month: Math.round((monthCals / calorieGoal) * 100) });
+      setGoalProgress({ week: Math.round((weekCals / calorieGoal) * 100), month: Math.round((monthCals / (calorieGoal * 4)) * 100) });
     }
     fetchStats();
   }, []);
@@ -434,47 +434,53 @@ export default function StatsScreen() {
 
 
       {/* --- Streak Counter, Personal Bests, Totals, Goal Progress --- */}
-      <View style={styles.statsSummarySection}>
-        <View style={styles.streakRow}>
-          <Text style={styles.streakLabel}>🔥 Streak:</Text>
-          <Text style={styles.streakValue}>Current: {streak.current} days</Text>
-          <Text style={styles.streakValue}>Best: {streak.best} days</Text>
-        </View>
-        <View style={styles.goalRow}>
-          <Text style={styles.goalLabel}>🎯 Calorie Goal Progress (Week):</Text>
-          <View style={styles.progressBarBg}>
+      <View style={styles.statsSummaryGrid}>
+        {/* Week Goal Progress */}
+        <View style={styles.statsSummaryBox}>
+          <Text style={[styles.goalLabel, {color: '#B6F533'}]}>🎯 Week</Text>
+          <View style={styles.progressBarBgSmall}>
             <View style={[styles.progressBar, { width: `${Math.min(goalProgress.week, 100)}%` }]} />
           </View>
           <Text style={styles.goalValue}>{goalProgress.week}%</Text>
         </View>
-        <View style={styles.goalRow}>
-          <Text style={styles.goalLabel}>🎯 Calorie Goal Progress (Month):</Text>
-          <View style={styles.progressBarBg}>
+        {/* Month Goal Progress */}
+        <View style={styles.statsSummaryBox}>
+          <Text style={[styles.goalLabel, {color: '#B6F533'}]}>Month</Text>
+          <View style={styles.progressBarBgSmall}>
             <View style={[styles.progressBar, { width: `${Math.min(goalProgress.month, 100)}%` }]} />
           </View>
           <Text style={styles.goalValue}>{goalProgress.month}%</Text>
         </View>
-        <View style={styles.totalsRow}>
-          <Text style={styles.totalsLabel}>📅 This Month:</Text>
+        {/* Streak */}
+        <View style={styles.statsSummaryBox}>
+          <Text style={styles.streakLabel}>Streak</Text>
+          <Text style={styles.streakValue}>Current: {streak.current} days</Text>
+          <Text style={styles.streakValue}>Best: {streak.best} days</Text>
+        </View>
+        {/* This Month Totals */}
+        <View style={styles.statsSummaryBox}>
+          <Text style={styles.totalsLabel}>This Month</Text>
           <Text style={styles.totalsValue}>Workouts: {monthlyTotals.workouts}</Text>
           <Text style={styles.totalsValue}>Calories: {monthlyTotals.calories}</Text>
           <Text style={styles.totalsValue}>Sets: {monthlyTotals.sets}</Text>
           <Text style={styles.totalsValue}>Reps: {monthlyTotals.reps}</Text>
         </View>
-        <View style={styles.totalsRow}>
-          <Text style={styles.totalsLabel}>🏆 All Time:</Text>
-          <Text style={styles.totalsValue}>Workouts: {allTimeTotals.workouts}</Text>
-          <Text style={styles.totalsValue}>Calories: {allTimeTotals.calories}</Text>
-          <Text style={styles.totalsValue}>Sets: {allTimeTotals.sets}</Text>
-          <Text style={styles.totalsValue}>Reps: {allTimeTotals.reps}</Text>
+        {/* All Time Totals */}
+        <View style={styles.statsSummaryBox}>
+          <Text style={styles.totalsLabel}>All Time</Text>
+          <Text style={styles.totalsValue}>W: {allTimeTotals.workouts}</Text>
+          <Text style={styles.totalsValue}>C: {allTimeTotals.calories}</Text>
+          <Text style={styles.totalsValue}>S: {allTimeTotals.sets}</Text>
+          <Text style={styles.totalsValue}>R: {allTimeTotals.reps}</Text>
         </View>
-        <View style={styles.bestsRow}>
-          <Text style={styles.bestsLabel}>🏋️ Personal Bests:</Text>
+        {/* Personal Bests */}
+        <View style={styles.statsSummaryBox}>
+          <Text style={styles.bestsLabel}>Personal Bests</Text>
           {Object.keys(personalBests).length === 0 ? (
-            <Text style={styles.bestsValue}>No data yet</Text>
+            <Text style={styles.bestsValue}>No data</Text>
           ) : (
             Object.entries(personalBests).map(([exercise, best]) => (
-              <Text key={exercise} style={styles.bestsValue}>
+              <Text key={exercise} style={styles.bestsValue} numberOfLines={1}>
                 {exercise}: {best.maxWeight > 0 ? `${best.maxWeight} lbs` : '-'} / {best.maxReps > 0 ? `${best.maxReps} reps` : '-'}
               </Text>
             ))
@@ -607,22 +613,23 @@ const styles = StyleSheet.create({
     color: '#181C20',
     marginBottom: 4,
   },
-  statsSummarySection: {
+  statsSummaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    // justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  statsSummaryBox: {
+    width: `${(100 - 3) / 2}%`,
+    padding: 10,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
+    borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
-  },
-  streakRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 12,
   },
   streakLabel: {
     fontWeight: 'bold',
@@ -632,12 +639,6 @@ const styles = StyleSheet.create({
   streakValue: {
     fontSize: 16,
     color: '#181C20',
-  },
-  goalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
   },
   goalLabel: {
     fontWeight: 'bold',
@@ -665,12 +666,6 @@ const styles = StyleSheet.create({
     minWidth: 36,
     textAlign: 'right',
   },
-  totalsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 10,
-  },
   totalsLabel: {
     fontWeight: 'bold',
     color: '#232B5D',
@@ -680,11 +675,6 @@ const styles = StyleSheet.create({
   totalsValue: {
     fontSize: 15,
     color: '#181C20',
-  },
-  bestsRow: {
-    flexDirection: 'column',
-    marginTop: 8,
-    gap: 2,
   },
   bestsLabel: {
     fontWeight: 'bold',
@@ -754,5 +744,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#ED2737',
     fontWeight: 'bold',
+  },
+  progressBarBgSmall: {
+    flex: 2,
+    height: 12,
+    backgroundColor: '#ECECEC',
+    borderRadius: 8,
+    marginHorizontal: 8,
+    overflow: 'hidden',
   },
 });
