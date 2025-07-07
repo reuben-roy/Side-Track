@@ -1,8 +1,11 @@
+import HumanMuscleMap from '@/components/HumanMuscleMap';
 import SlotPicker from '@/components/SlotPicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { exercises } from '../../constants/Exercises';
+import { muscleGroups } from '../../constants/MuscleGroups';
+import { calculateCapacityDrain } from '../../helper/utils';
 
 interface WorkoutScreenProps {
   exercise: string;
@@ -39,6 +42,23 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       const logs = prev ? JSON.parse(prev) : [];
       logs.push(workout);
       await AsyncStorage.setItem('workoutLogs', JSON.stringify(logs));
+
+      // --- Decrease muscle capacity after logging workout ---
+      const prevCapacityStr = await AsyncStorage.getItem('muscleCapacity');
+      let prevCapacity: Record<string, number> = prevCapacityStr ? JSON.parse(prevCapacityStr) : { ...require('../../constants/Exercises').maxMuscleCapacity };
+      // Parse reps as number (e.g., '10 reps' -> 10)
+      const repsNum = parseInt(repsList[repsIdx]);
+      // Parse weight as number (e.g., '135 lbs' -> 135, or 'Bodyweight' remains string)
+      const weightVal = weights[weightIdx].includes('lbs') ? parseInt(weights[weightIdx]) : weights[weightIdx];
+      const drain = calculateCapacityDrain(exercise, weightVal, repsNum);
+      muscleGroups.forEach(muscle => {
+        if (drain[muscle]) {
+          prevCapacity[muscle] = Math.max(0, (prevCapacity[muscle] || 100) - drain[muscle]!);
+        }
+      });
+      await AsyncStorage.setItem('muscleCapacity', JSON.stringify(prevCapacity));
+      // --- End muscle capacity update ---
+
       setLogging(false);
       setShowToast(true);
       setTimeout(() => setShowToast(false), 2000);
@@ -56,6 +76,7 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       </TouchableOpacity>
       <Text style={styles.header}>Log Workout</Text>
       <Text style={styles.exerciseName}>{exercise}</Text>
+      <HumanMuscleMap />
       {showToast && (
         <View style={styles.toast}>
           <Text style={styles.toastText}>Workout logged!</Text>
