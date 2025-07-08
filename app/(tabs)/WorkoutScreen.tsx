@@ -33,13 +33,14 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
     setLogging(true);
     const workout = {
       exercise,
-      weight: weights[weightIdx],
-      reps: repsList[repsIdx],
+      weight: parseInt(weights[weightIdx].split(" ")[0], 10),
+      reps: parseInt(repsList[repsIdx].split(" ")[0]),
       date: new Date().toISOString(),
     };
     try {
       const prev = await AsyncStorage.getItem('workoutLogs');
       const logs = prev ? JSON.parse(prev) : [];
+      console.log("workout logs", logs);
       logs.push(workout);
       await AsyncStorage.setItem('workoutLogs', JSON.stringify(logs));
 

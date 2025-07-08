@@ -185,7 +185,6 @@ const BodyView = React.memo(({ view, selectedMuscles, onMusclePress }: BodyViewP
     <View style={styles.bodyViewContainer}>
       <Text style={styles.bodyViewTitle}>{`${view.charAt(0).toUpperCase()}${view.slice(1)} View`}</Text>
       <Svg height="300" width="150" viewBox="0 0 148 380" style={styles.svgContainer}>
-        {/* Background SVG body diagram */}
         <Image
           href={svgImage}
           width="148"
@@ -303,7 +302,6 @@ export default function HumanMuscleMap() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor: '#F5F5F5', // bg-gray-100 & bg-gradient-to-br from-gray-50 to-gray-100
   },
   scrollContent: {
     alignItems: 'center',
@@ -342,10 +340,6 @@ const styles = StyleSheet.create({
     borderColor: '#D1D5DB', // border-gray-300
     borderRadius: 12, // rounded-xl
     backgroundColor: '#FFFFFF', // bg-white
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
     elevation: 6, // shadow-lg
     minHeight: 300, // min-h-[300px]
   },

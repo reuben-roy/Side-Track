@@ -1,28 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { BarChart } from 'react-native-gifted-charts';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import CaloriesChart from '../../components/CaloriesChart';
+import MuscleCapacitySection from '../../components/MuscleCapacitySection';
 import ProfileButton from '../../components/ProfileButton';
-import { exercises, maxMuscleCapacity } from '../../constants/Exercises';
-import { MuscleGroup, muscleGroups } from '../../constants/MuscleGroups';
-import { applyRecovery } from '../../helper/utils';
+import { exercises } from '../../constants/Exercises';
 
 interface WorkoutLog {
   exercise: string;
-  sets: Array<{ set: number; weight: string; reps: string }>;
-  timer: { h: string; m: string; s: string };
+  weight: number;
+  reps: number;
   date: string;
 }
 
-function getExerciseMET(name: string) {
-  const ex = exercises.find(e => e.name === name);
-  return ex ? ex.met : 5; // fallback MET
+// Helper functions for new log format
+function getRepsCount(log: WorkoutLog) {
+  return typeof log.reps === 'number' ? log.reps : 0;
 }
-
-function parseWeight(weightStr: string) {
-  // Expecting '170 lb' or just a number string
-  const match = weightStr.match(/(\d+\.?\d*)/);
-  return match ? parseFloat(match[1]) : 170;
+function getWeight(log: WorkoutLog, fallbackWeight: number) {
+  return typeof log.weight === 'number' ? log.weight : fallbackWeight;
 }
 
 function formatDate(dateString: string) {
@@ -36,175 +32,9 @@ function formatDate(dateString: string) {
   });
 }
 
-function getStartOfWeek(date: Date) {
-  const d = new Date(date);
-  const day = d.getDay(); // 0 (Sun) - 6 (Sat)
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
-  return new Date(d.setDate(diff));
-}
-
-function getWeekDays(start: Date) {
-  const days = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    days.push(d);
-  }
-  return days;
-}
-
-function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function getMonthDays(year: number, month: number) {
-  const days = [];
-  const total = getDaysInMonth(year, month);
-  for (let i = 1; i <= total; i++) {
-    days.push(new Date(year, month, i));
-  }
-  return days;
-}
-
-// --- Muscle Capacity Tracker Section ---
-type MuscleCapacity = { [key in MuscleGroup]: number };
-
-const DEFAULT_MUSCLE_CAPACITY: MuscleCapacity = { ...maxMuscleCapacity };
-
-function fillMissingMuscleCapacity(cap: Partial<MuscleCapacity>): MuscleCapacity {
-  // Ensure all muscle groups are present and have a number value
-  const filled: MuscleCapacity = { ...maxMuscleCapacity };
-  for (const key of muscleGroups) {
-    if (typeof cap[key] === 'number') filled[key] = cap[key]!;
-  }
-  return filled;
-}
-
-// Helper: interpolate color between two hex colors
-function interpolateColor(color1: string, color2: string, factor: number): string {
-  // color1 and color2 are hex strings like '#RRGGBB'
-  const c1 = color1.substring(1);
-  const c2 = color2.substring(1);
-  const r1 = parseInt(c1.substring(0, 2), 16);
-  const g1 = parseInt(c1.substring(2, 4), 16);
-  const b1 = parseInt(c1.substring(4, 6), 16);
-  const r2 = parseInt(c2.substring(0, 2), 16);
-  const g2 = parseInt(c2.substring(2, 4), 16);
-  const b2 = parseInt(c2.substring(4, 6), 16);
-  const r = Math.round(r1 + (r2 - r1) * factor);
-  const g = Math.round(g1 + (g2 - g1) * factor);
-  const b = Math.round(b1 + (b2 - b1) * factor);
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
-
-// Get bar color: red (0%) -> yellow (50%) -> green (100%)
-function getBarColor(percent: number): string {
-  if (percent <= 0.5) {
-    // Red to yellow
-    return interpolateColor('#F44336', '#FFC107', percent / 0.5);
-  } else {
-    // Yellow to green
-    return interpolateColor('#FFC107', '#4CAF50', (percent - 0.5) / 0.5);
-  }
-}
-
-function MuscleCapacitySection() {
-  const [muscleCapacity, setMuscleCapacity] = useState<MuscleCapacity>(DEFAULT_MUSCLE_CAPACITY);
-  const [lastExerciseTime, setLastExerciseTime] = useState<number | null>(null);
-
-  // Load from AsyncStorage on mount and whenever logs change
-  useEffect(() => {
-    (async () => {
-      const stored = await AsyncStorage.getItem('muscleCapacity');
-      if (stored) setMuscleCapacity(fillMissingMuscleCapacity(JSON.parse(stored)));
-      // Find the most recent exercise log
-      const logsStr = await AsyncStorage.getItem('workoutLogs');
-      if (logsStr) {
-        const logs = JSON.parse(logsStr);
-        if (Array.isArray(logs) && logs.length > 0) {
-          // Find the latest log date
-          const latest = logs.reduce((max, log) => {
-            const t = new Date(log.date).getTime();
-            return t > max ? t : max;
-          }, 0);
-          setLastExerciseTime(latest);
-        }
-      }
-    })();
-  }, []);
-
-  // On mount and whenever lastExerciseTime changes, apply recovery
-  useEffect(() => {
-    if (lastExerciseTime) {
-      const now = Date.now();
-      const hoursPassed = (now - lastExerciseTime) / (1000 * 60 * 60);
-      if (hoursPassed > 0) {
-        setMuscleCapacity(prev => {
-          const recovered = fillMissingMuscleCapacity(applyRecovery(prev, hoursPassed));
-          AsyncStorage.setItem('muscleCapacity', JSON.stringify(recovered));
-          return recovered;
-        });
-      }
-    }
-  }, [lastExerciseTime]);
-
-  // Automatic recovery every hour as fallback
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMuscleCapacity(prev => {
-        const recovered = fillMissingMuscleCapacity(applyRecovery(prev, 1));
-        AsyncStorage.setItem('muscleCapacity', JSON.stringify(recovered));
-        return recovered;
-      });
-    }, 60 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Helper to group muscleGroups into pairs
-  function getMusclePairs(arr: MuscleGroup[]): MuscleGroup[][] {
-    const pairs: MuscleGroup[][] = [];
-    for (let i = 0; i < arr.length; i += 2) {
-      pairs.push([arr[i], arr[i + 1]].filter(Boolean) as MuscleGroup[]);
-    }
-    return pairs;
-  }
-
-  return (
-    <View style={styles.muscleSection}>
-      <Text style={styles.muscleHeader}>Muscle Capacity</Text>
-      {getMusclePairs([...muscleGroups]).map((pair, idx) => (
-        <View key={idx} style={styles.muscleRow}>
-          {pair.map(muscle => {
-            const capacity = muscleCapacity[muscle];
-            const max = maxMuscleCapacity[muscle];
-            const percent = Math.max(0, Math.min(1, capacity / max));
-            const barColor = getBarColor(percent);
-            const boxColor = getBarColor(percent);
-            return (
-              <View key={muscle} style={[styles.muscleBarContainerHalf, { backgroundColor: boxColor }]}> {/* Box with dynamic color */}
-                <View style={styles.muscleBoxContent}> {/* Inner padding and rounded edges */}
-                  <Text style={styles.muscleName}>{muscle.replace(/([A-Z])/g, ' $1').trim()}</Text>
-                  <View style={styles.muscleProgressBarBg}>
-                    <View style={[styles.muscleProgressBarFill, { width: `${percent * 100}%`, backgroundColor: barColor }]} />
-                    <View style={styles.musclePercentContainer} pointerEvents="none">
-                      <Text style={styles.musclePercent}>{Math.round(capacity)}%</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      ))}
-      <Text style={styles.info}>Indicates how much your muscles have recovered after previous exercises</Text>
-    </View>
-  );
-}
-
 export default function StatsScreen() {
   const [calories, setCalories] = useState<number | null>(null);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
-  const [weeklyCalories, setWeeklyCalories] = useState<{ [key: string]: number }>({});
   const [profile, setProfile] = useState<{ weight: string; height: string; calorieGoal: string }>({ weight: '', height: '', calorieGoal: '' });
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [personalBests, setPersonalBests] = useState<{ [exercise: string]: { maxWeight: number; maxReps: number } }>({});
@@ -212,355 +42,219 @@ export default function StatsScreen() {
   const [allTimeTotals, setAllTimeTotals] = useState({ workouts: 0, calories: 0, sets: 0, reps: 0 });
   const [goalProgress, setGoalProgress] = useState({ week: 0, month: 0 });
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('week');
+  const [expandedOptions, setExpandedOptions] = useState<number | null>(null);
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  const monthDays = getMonthDays(currentYear, currentMonth);
-  // Map: YYYY-MM-DD -> calories
-  const caloriesPerDay: { [date: string]: number } = {};
-  workoutLogs.forEach(log => {
-    const d = new Date(log.date);
-    if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
-      const key = d.toISOString().slice(0, 10);
-      const met = getExerciseMET(log.exercise);
-      let durationMin = 0;
-      if (log.timer && (log.timer.h !== '00' || log.timer.m !== '00' || log.timer.s !== '00')) {
-        durationMin = (parseInt(log.timer.h) || 0) * 60 + (parseInt(log.timer.m) || 0) + ((parseInt(log.timer.s) || 0) / 60);
-      } else {
-        durationMin = (log.sets?.length || 1) * 2;
-      }
-      const weightLbs = parseWeight(profile.weight || '170');
-      const weightKg = weightLbs * 0.453592;
-      const cals = (met * weightKg * 3.5 / 200) * durationMin;
-      caloriesPerDay[key] = (caloriesPerDay[key] || 0) + Math.round(cals);
+  // Function to toggle options for a specific workout
+  const toggleOptions = (index: number) => {
+    setExpandedOptions(expandedOptions === index ? null : index);
+  };
+
+  // Function to delete a workout
+  const deleteWorkout = async (index: number) => {
+    console.log('Delete button pressed for index:', index);
+    
+    // Use different confirmation methods for web vs native
+    let shouldDelete = false;
+    
+    if (Platform.OS === 'web') {
+      shouldDelete = window.confirm('Are you sure you want to delete this workout? This action cannot be undone.');
+    } else {
+      // For native platforms, use Alert.alert
+      Alert.alert(
+        'Delete Workout',
+        'Are you sure you want to delete this workout? This action cannot be undone.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              await performDelete(index);
+            },
+          },
+        ]
+      );
+      return; // Exit early for native platforms
     }
-  });
-  // Find max calories in month for scaling
-  const maxCals = Math.max(...Object.values(caloriesPerDay), 1);
-
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const caloriesPerMonth: { [month: string]: number } = {};
-  for (let i = 0; i < 12; i++) {
-    caloriesPerMonth[months[i]] = 0;
-  }
-  workoutLogs.forEach(log => {
-    const d = new Date(log.date);
-    if (d.getFullYear() === currentYear) {
-      const met = getExerciseMET(log.exercise);
-      let durationMin = 0;
-      if (log.timer && (log.timer.h !== '00' || log.timer.m !== '00' || log.timer.s !== '00')) {
-        durationMin = (parseInt(log.timer.h) || 0) * 60 + (parseInt(log.timer.m) || 0) + ((parseInt(log.timer.s) || 0) / 60);
-      } else {
-        durationMin = (log.sets?.length || 1) * 2;
-      }
-      const weightLbs = parseWeight(profile.weight || '170');
-      const weightKg = weightLbs * 0.453592;
-      const cals = (met * weightKg * 3.5 / 200) * durationMin;
-      const monthName = months[d.getMonth()];
-      caloriesPerMonth[monthName] = (caloriesPerMonth[monthName] || 0) + Math.round(cals);
+    
+    // For web, perform delete directly if confirmed
+    if (shouldDelete) {
+      await performDelete(index);
     }
-  });
-  const yearBarData = months.map((month: string) => ({
-    value: caloriesPerMonth[month] || 0,
-    label: month,
-    frontColor: '#ED2737',
-    gradientColor: '#F5F2F2',
-  }));
+  };
 
-  useEffect(() => {
-    async function fetchStats() {
-      // Get user weight and calorie goal
-      const profileStr = await AsyncStorage.getItem('profile');
-      let weightLbs = 170;
-      let calorieGoal = 2000;
-      if (profileStr) {
-        const profileObj = JSON.parse(profileStr);
-        weightLbs = parseWeight(profileObj.weight || '170');
-        calorieGoal = parseInt((profileObj.calorieGoal || '2000').replace(/[^0-9]/g, ''));
-        setProfile(profileObj);
+  const performDelete = async (index: number) => {
+    console.log('Delete confirmed for index:', index);
+    try {
+      const updatedLogs = workoutLogs.filter((_, i) => i !== index);
+      console.log('Updated logs:', updatedLogs);
+      await AsyncStorage.setItem('workoutLogs', JSON.stringify(updatedLogs));
+      setWorkoutLogs(updatedLogs);
+      
+      // Refresh stats after deletion
+      fetchStats();
+    } catch (error) {
+      console.error('Error deleting workout:', error);
+      if (Platform.OS === 'web') {
+        alert('Failed to delete workout. Please try again.');
+      } else {
+        Alert.alert('Error', 'Failed to delete workout. Please try again.');
       }
-      const weightKg = weightLbs * 0.453592;
+    }
+  };
 
-      // Get workout logs
-      const logsStr = await AsyncStorage.getItem('workoutLogs');
-      let totalCals = 0;
-      let logs: WorkoutLog[] = [];
-      if (logsStr) {
-        logs = JSON.parse(logsStr);
-        // Sort logs by date (newest first)
-        logs.sort((a: WorkoutLog, b: WorkoutLog) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
-        for (const log of logs) {
-          const met = getExerciseMET(log.exercise);
-          // Estimate duration: 2 min per set if timer not used
-          let durationMin = 0;
-          if (log.timer && (log.timer.h !== '00' || log.timer.m !== '00' || log.timer.s !== '00')) {
-            durationMin = (parseInt(log.timer.h) || 0) * 60 + (parseInt(log.timer.m) || 0) + ((parseInt(log.timer.s) || 0) / 60);
-          } else {
-            durationMin = (log.sets?.length || 1) * 2;
-          }
-          // Calories = (MET * weightKg * 3.5 / 200) * duration (min)
-          const cals = (met * weightKg * 3.5 / 200) * durationMin;
-          totalCals += cals;
-        }
+  // Function to fetch and calculate stats
+  const fetchStats = async () => {
+    // Get user weight and calorie goal
+    const profileStr = await AsyncStorage.getItem('profile');
+    let weightLbs = 170;
+    let calorieGoal = 2000;
+    if (profileStr) {
+      const profileObj = JSON.parse(profileStr);
+      // Parse weight from string format
+      const weightMatch = profileObj.weight?.match(/(\d+\.?\d*)/);
+      weightLbs = weightMatch ? parseFloat(weightMatch[1]) : 170;
+      calorieGoal = parseInt((profileObj.calorieGoal || '2000').replace(/[^0-9]/g, ''));
+      setProfile(profileObj);
+    }
+    const weightKg = weightLbs * 0.453592;
+
+    // Get workout logs
+    const logsStr = await AsyncStorage.getItem('workoutLogs');
+    let totalCals = 0;
+    let logs: WorkoutLog[] = [];
+    if (logsStr) {
+      logs = JSON.parse(logsStr);
+      // Sort logs by date (newest first)
+      logs.sort((a: WorkoutLog, b: WorkoutLog) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      for (const log of logs) {
+        // Get exercise MET value
+        const exercise = exercises.find(e => e.name === log.exercise);
+        const met = exercise ? exercise.met : 5;
+        // Estimate duration: 2 min per set if timer not used
+        let durationMin = 1 * 2; // 1 set * 2 minutes
+        // Calories = (MET * weightKg * 3.5 / 200) * duration (min)
+        const cals = (met * weightKg * 3.5 / 200) * durationMin;
+        totalCals += cals;
       }
-      setCalories(Math.round(totalCals));
-      setWorkoutLogs(logs);
+    }
+    setCalories(Math.round(totalCals));
+    setWorkoutLogs(logs);
 
-      // Calculate weekly calories
-      const now = new Date();
-      const startOfWeek = getStartOfWeek(now);
-      const weekDays = getWeekDays(startOfWeek);
-      const weekCalories: { [key: string]: number } = {};
-      weekDays.forEach(day => {
-        const key = day.toLocaleDateString('en-US', { weekday: 'short' });
-        weekCalories[key] = 0;
-      });
-      if (logsStr) {
-        const logs: WorkoutLog[] = JSON.parse(logsStr);
-        logs.forEach(log => {
-          const logDate = new Date(log.date);
-          // Only include logs from this week
-          if (logDate >= startOfWeek && logDate <= weekDays[6]) {
-            const met = getExerciseMET(log.exercise);
-            let durationMin = 0;
-            if (log.timer && (log.timer.h !== '00' || log.timer.m !== '00' || log.timer.s !== '00')) {
-              durationMin = (parseInt(log.timer.h) || 0) * 60 + (parseInt(log.timer.m) || 0) + ((parseInt(log.timer.s) || 0) / 60);
-            } else {
-              durationMin = (log.sets?.length || 1) * 2;
-            }
-            const cals = (met * weightKg * 3.5 / 200) * durationMin;
-            const key = logDate.toLocaleDateString('en-US', { weekday: 'short' });
-            weekCalories[key] = (weekCalories[key] || 0) + Math.round(cals);
-          }
-        });
-      }
-      setWeeklyCalories(weekCalories);
-
-      // --- Streak Counter ---
-      // Get unique workout days (YYYY-MM-DD)
-      const daysSet = new Set(logs.map(log => new Date(log.date).toISOString().slice(0, 10)));
-      const daysArr = Array.from(daysSet).sort();
-      let currentStreak = 0, bestStreak = 0, streak = 0;
-      let prev = null;
-      for (let i = 0; i < daysArr.length; i++) {
-        const d = new Date(daysArr[i]);
-        if (prev) {
-          const diff = (d.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
-          if (diff === 1) {
-            streak++;
-          } else {
-            streak = 1;
-          }
+    // --- Streak Counter ---
+    // Get unique workout days (YYYY-MM-DD)
+    const daysSet = new Set(logs.map(log => new Date(log.date).toISOString().slice(0, 10)));
+    const daysArr = Array.from(daysSet).sort();
+    let currentStreak = 0, bestStreak = 0, streak = 0;
+    let prev = null;
+    for (let i = 0; i < daysArr.length; i++) {
+      const d = new Date(daysArr[i]);
+      if (prev) {
+        const diff = (d.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
+        if (diff === 1) {
+          streak++;
         } else {
           streak = 1;
         }
-        if (streak > bestStreak) bestStreak = streak;
-        prev = d;
+      } else {
+        streak = 1;
       }
-      // Current streak: count back from today
-      let today = new Date(); today.setHours(0,0,0,0);
-      let streakCount = 0;
-      for (let i = daysArr.length - 1; i >= 0; i--) {
-        const d = new Date(daysArr[i]);
-        if ((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24) === streakCount) {
-          streakCount++;
-        } else {
-          break;
-        }
-      }
-      setStreak({ current: streakCount, best: bestStreak });
-
-      // --- Personal Bests ---
-      const bests: { [exercise: string]: { maxWeight: number; maxReps: number } } = {};
-      logs.forEach(log => {
-        if (!bests[log.exercise]) bests[log.exercise] = { maxWeight: 0, maxReps: 0 };
-        (log.sets || []).forEach(set => {
-          const weight = parseInt(set.weight);
-          const reps = parseInt(set.reps);
-          if (!isNaN(weight) && weight > bests[log.exercise].maxWeight) bests[log.exercise].maxWeight = weight;
-          if (!isNaN(reps) && reps > bests[log.exercise].maxReps) bests[log.exercise].maxReps = reps;
-        });
-      });
-      setPersonalBests(bests);
-
-      // --- Monthly & All-Time Totals ---
-      const nowMonth = now.getMonth(), nowYear = now.getFullYear();
-      let monthWorkouts = 0, monthCalories = 0, monthSets = 0, monthReps = 0;
-      let allWorkouts = logs.length, allCalories = 0, allSets = 0, allReps = 0;
-      logs.forEach(log => {
-        const logDate = new Date(log.date);
-        const met = getExerciseMET(log.exercise);
-        let durationMin = 0;
-        if (log.timer && (log.timer.h !== '00' || log.timer.m !== '00' || log.timer.s !== '00')) {
-          durationMin = (parseInt(log.timer.h) || 0) * 60 + (parseInt(log.timer.m) || 0) + ((parseInt(log.timer.s) || 0) / 60);
-        } else {
-          durationMin = ((log.sets || []).length || 1) * 2;
-        }
-        const cals = (met * weightKg * 3.5 / 200) * durationMin;
-        allCalories += cals;
-        allSets += (log.sets || []).length;
-        allReps += (log.sets || []).reduce((sum, s) => sum + parseInt(s.reps), 0);
-        if (logDate.getMonth() === nowMonth && logDate.getFullYear() === nowYear) {
-          monthWorkouts++;
-          monthCalories += cals;
-          monthSets += (log.sets || []).length;
-          monthReps += (log.sets || []).reduce((sum, s) => sum + parseInt(s.reps), 0);
-        }
-      });
-      setMonthlyTotals({ workouts: monthWorkouts, calories: Math.round(monthCalories), sets: monthSets, reps: monthReps });
-      setAllTimeTotals({ workouts: allWorkouts, calories: Math.round(allCalories), sets: allSets, reps: allReps });
-
-      // --- Goal Progress ---
-      // Week
-      let weekCals = 0, monthCals = 0;
-      const startOfWeekForGoal = getStartOfWeek(now);
-      logs.forEach(log => {
-        const logDate = new Date(log.date);
-        const met = getExerciseMET(log.exercise);
-        let durationMin = 0;
-        if (log.timer && (log.timer.h !== '00' || log.timer.m !== '00' || log.timer.s !== '00')) {
-          durationMin = (parseInt(log.timer.h) || 0) * 60 + (parseInt(log.timer.m) || 0) + ((parseInt(log.timer.s) || 0) / 60);
-        } else {
-          durationMin = (log.sets?.length || 1) * 2;
-        }
-        const cals = (met * weightKg * 3.5 / 200) * durationMin;
-        if (logDate >= startOfWeekForGoal) weekCals += cals;
-        if (logDate.getMonth() === nowMonth && logDate.getFullYear() === nowYear) monthCals += cals;
-      });
-      setGoalProgress({ week: Math.round((weekCals / calorieGoal) * 100), month: Math.round((monthCals / (calorieGoal * 4)) * 100) });
+      if (streak > bestStreak) bestStreak = streak;
+      prev = d;
     }
+    // Current streak: count back from today
+    let today = new Date(); today.setHours(0,0,0,0);
+    let streakCount = 0;
+    for (let i = daysArr.length - 1; i >= 0; i--) {
+      const d = new Date(daysArr[i]);
+      if ((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24) === streakCount) {
+        streakCount++;
+      } else {
+        break;
+      }
+    }
+    setStreak({ current: streakCount, best: bestStreak });
+
+    // --- Personal Bests ---
+    const bests: { [exercise: string]: { maxWeight: number; maxReps: number } } = {};
+    logs.forEach(log => {
+      if (!bests[log.exercise]) bests[log.exercise] = { maxWeight: 0, maxReps: 0 };
+      const weight = getWeight(log, 0);
+      const reps = getRepsCount(log);
+      if (!isNaN(weight) && weight > bests[log.exercise].maxWeight) bests[log.exercise].maxWeight = weight;
+      if (!isNaN(reps) && reps > bests[log.exercise].maxReps) bests[log.exercise].maxReps = reps;
+    });
+    setPersonalBests(bests);
+
+    // --- Monthly & All-Time Totals ---
+    const now = new Date();
+    const nowMonth = now.getMonth(), nowYear = now.getFullYear();
+    let monthWorkouts = 0, monthCalories = 0, monthSets = 0, monthReps = 0;
+    let allWorkouts = logs.length, allCalories = 0, allSets = 0, allReps = 0;
+    logs.forEach(log => {
+      const logDate = new Date(log.date);
+      const exercise = exercises.find(e => e.name === log.exercise);
+      const met = exercise ? exercise.met : 5;
+      let durationMin = 1 * 2; // 1 set * 2 minutes
+      const cals = (met * weightKg * 3.5 / 200) * durationMin;
+      allCalories += cals;
+      allSets += 1; // 1 set per log
+      allReps += getRepsCount(log);
+      if (logDate.getMonth() === nowMonth && logDate.getFullYear() === nowYear) {
+        monthWorkouts++;
+        monthCalories += cals;
+        monthSets += 1; // 1 set per log
+        monthReps += getRepsCount(log);
+      }
+    });
+    setMonthlyTotals({ workouts: monthWorkouts, calories: Math.round(monthCalories), sets: monthSets, reps: monthReps });
+    setAllTimeTotals({ workouts: allWorkouts, calories: Math.round(allCalories), sets: allSets, reps: allReps });
+
+    // --- Goal Progress ---
+    // Week
+    let weekCals = 0, monthCals = 0;
+    const startOfWeek = getStartOfWeekForGoal(now);
+    logs.forEach(log => {
+      const logDate = new Date(log.date);
+      const exercise = exercises.find(e => e.name === log.exercise);
+      const met = exercise ? exercise.met : 5;
+      let durationMin = 1 * 2; // 1 set * 2 minutes
+      const cals = (met * weightKg * 3.5 / 200) * durationMin;
+      if (logDate >= startOfWeek) weekCals += cals;
+      if (logDate.getMonth() === nowMonth && logDate.getFullYear() === nowYear) monthCals += cals;
+    });
+    setGoalProgress({ week: Math.round((weekCals / calorieGoal) * 100), month: Math.round((monthCals / (calorieGoal * 4)) * 100) });
+  };
+
+  useEffect(() => {
     fetchStats();
   }, []);
 
-  // Prepare data for BarChart
-  const weekOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const barData = weekOrder.map(day => ({
-    value: weeklyCalories[day] || 0,
-    label: day,
-    frontColor: '#ED2737',
-    gradientColor: '#F5F2F2',
-  }));
-
-  const screenWidth = Dimensions.get('window').width;
-  const barWidth = 30;
-  const initialSpacing = 10;
-  const totalHorizontalPadding = 64;
-  const spacing = (screenWidth - totalHorizontalPadding * 2 - (barWidth * 7) - initialSpacing) / 7;
-  const yearBarInitialSpacing = 5;
-  const yearBarWidth = ((screenWidth - totalHorizontalPadding * 2 - yearBarInitialSpacing) * 4) / (5 * 12);
-  const yearBarSpacing = (screenWidth - totalHorizontalPadding * 2 - (yearBarWidth * 12) - yearBarInitialSpacing) / 11;
-
-  const buttonCount = 3;
-  const minButtonWidth = 60; // Minimum width for each button's content
-  const periodButtonHorizontalPadding = Math.max(10, (screenWidth - totalHorizontalPadding *3 - 2*6) / (buttonCount * 2));
-
-  // Dynamic style for periodButton
-  function getPeriodButtonStyle(paddingHorizontal: number) {
-    return {
-      paddingVertical: 6,
-      paddingHorizontal,
-      borderRadius: 10,
-      backgroundColor: '#ECECEC',
-      marginHorizontal: 2,
-    };
+  // Helper function for getting start of week
+  function getStartOfWeekForGoal(date: Date) {
+    const d = new Date(date);
+    const day = d.getDay(); // 0 (Sun) - 6 (Sat)
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    return new Date(d.setDate(diff));
   }
+
+
 
   return (
     <ScrollView style={styles.container}>
       <ProfileButton top={18} right={0} />
       <Text style={styles.text}>Stats</Text>
-        {/* Inline period selector buttons */}
-        <View style={styles.periodSelectorRow}>
-          {['week', 'month', 'year'].map(period => (
-            <TouchableOpacity
-              key={period}
-              style={[getPeriodButtonStyle(periodButtonHorizontalPadding), selectedPeriod === period && styles.periodButtonSelected]}
-              onPress={() => setSelectedPeriod(period as 'week' | 'month' | 'year')}
-            >
-              <Text style={[styles.periodButtonText, selectedPeriod === period && styles.periodButtonTextSelected]}>
-                {period.charAt(0).toUpperCase() + period.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-      {/* Weekly Calories Bar Chart */}
-      <View style={styles.chartSection}>
-        <Text style={styles.sectionTitle}>
-          {selectedPeriod === 'week' ? 'Calories Burned This Week' : selectedPeriod === 'month' ? 'Calories Burned This Month' : 'Calories Burned This Year'}
-        </Text>
-        {selectedPeriod === 'week' && (
-          <BarChart
-            data={barData}
-            barWidth={30}
-            initialSpacing={initialSpacing}
-            spacing={spacing}
-            barBorderRadius={8}
-            showGradient
-            yAxisThickness={0}
-            xAxisType={'dashed'}
-            xAxisColor={'#ECECEC'}
-            yAxisTextStyle={{ color: '#C2BABA' }}
-            maxValue={Math.max(...barData.map(b => b.value), 100)}
-            noOfSections={4}
-            xAxisLabelTextStyle={{ color: '#C2BABA', textAlign: 'center', fontWeight: 'bold' }}
-            height={180}
-            disableScroll
-          />
-        )}
-        {selectedPeriod === 'month' && (
-          <View style={styles.calendarGrid}>
-            {/* Render days of week header */}
-            <View style={styles.calendarHeaderRow}>
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                <Text key={d} style={styles.calendarHeaderText}>{d}</Text>
-              ))}
-            </View>
-            {/* Render calendar days */}
-            <View style={styles.calendarDaysGrid}>
-              {/* Add empty slots for first day of month */}
-              {Array(monthDays[0].getDay()).fill(null).map((_, i) => (
-                <View key={'empty-' + i} style={styles.calendarDayCell} />
-              ))}
-              {monthDays.map((date: Date, idx: number) => {
-                const key = date.toISOString().slice(0, 10);
-                const cals = caloriesPerDay[key] || 0;
-                // Circle radius: min 10, max 28
-                const minR = 10, maxR = 28;
-                const r = cals === 0 ? minR : minR + ((maxR - minR) * cals) / maxCals;
-                return (
-                  <View key={key} style={styles.calendarDayCell}>
-                    <View style={[styles.calendarCircle, { width: r * 2, height: r * 2, borderRadius: r, backgroundColor: cals > 0 ? '#ED2737' : '#ECECEC' }]}/>
-                    <Text style={styles.calendarDayText}>{date.getDate()}</Text>
-                    {cals > 0 && <Text style={styles.calendarCalsText}>{cals}</Text>}
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        )}
-        {selectedPeriod === 'year' && (
-          <BarChart
-            data={yearBarData}
-            barWidth={yearBarWidth}
-            initialSpacing={yearBarInitialSpacing}
-            spacing={yearBarSpacing}
-            barBorderRadius={5}
-            showGradient
-            yAxisThickness={0}
-            xAxisType={'dashed'}
-            xAxisColor={'#ECECEC'}
-            yAxisTextStyle={{ color: '#C2BABA' }}
-            maxValue={Math.max(...yearBarData.map((b: any) => b.value), 100)}
-            noOfSections={4}
-            xAxisLabelTextStyle={{ color: '#C2BABA', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}
-            height={180}
-            disableScroll
-          />
-        )}
-      </View>
+      
+      <CaloriesChart
+        workoutLogs={workoutLogs}
+        profile={profile}
+        selectedPeriod={selectedPeriod}
+        onPeriodChange={setSelectedPeriod}
+      />
 
       <MuscleCapacitySection />
 
@@ -632,15 +326,31 @@ export default function StatsScreen() {
             <View key={index} style={styles.workoutCard}>
               <View style={styles.workoutHeader}>
                 <Text style={styles.exerciseName}>{log.exercise}</Text>
-                <Text style={styles.workoutDate}>{formatDate(log.date)}</Text>
+                <View style={styles.headerRight}>
+                  <Text style={styles.workoutDate}>{formatDate(log.date)}</Text>
+                  <TouchableOpacity 
+                    style={styles.optionsButton}
+                    onPress={() => toggleOptions(index)}
+                  >
+                    <Text style={styles.optionsIcon}>⋮</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={styles.setsContainer}>
-                {(log.sets || []).map((set, setIndex) => (
-                  <Text key={setIndex} style={styles.setText}>
-                    Set {set.set}: {set.weight} lbs × {set.reps} reps
-                  </Text>
-                ))}
+                <Text style={styles.setText}>
+                  {log.weight ? `${log.weight} lbs` : '-'} × {log.reps ? `${log.reps} reps` : '-'}
+                </Text>
               </View>
+              {expandedOptions === index && (
+                <View style={styles.optionsContainer}>
+                  <TouchableOpacity 
+                    style={styles.deleteButtonContainer}
+                    onPress={() => deleteWorkout(index)}
+                  >
+                    <Text style={styles.deleteButton}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           ))
         )}
@@ -663,22 +373,6 @@ const styles = StyleSheet.create({
     color: '#181C20',
     marginTop: 25,
     marginBottom: 24,
-  },
-  chartSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  label: {
-    fontSize: 20,
-    color: '#181C20',
-    marginBottom: 8,
   },
   calories: {
     fontWeight: 'bold',
@@ -729,6 +423,25 @@ const styles = StyleSheet.create({
     color: '#C2BABA',
     fontWeight: '500',
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  optionsButton: {
+    padding: 4,
+  },
+  optionsIcon: {
+    fontSize: 18,
+    color: '#C2BABA',
+    fontWeight: 'bold',
+  },
+  optionsContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
   setsContainer: {
     marginTop: 8,
   },
@@ -736,6 +449,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#181C20',
     marginBottom: 4,
+  },
+  workoutContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  deleteButtonContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FFE5E5',
+    borderRadius: 6,
   },
   statsSummaryGrid: {
     flexDirection: 'row',
@@ -810,64 +535,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#181C20',
   },
-  periodSelectorRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 12,
-  },
-  periodButtonSelected: {
-    backgroundColor: '#ED2737',
-  },
-  periodButtonText: {
-    color: '#181C20',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  periodButtonTextSelected: {
-    color: '#fff',
-  },
-  calendarGrid: {
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  calendarHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  calendarHeaderText: {
-    flex: 1,
-    textAlign: 'center',
-    fontWeight: 'bold',
-    color: '#232B5D',
-    fontSize: 15,
-  },
-  calendarDaysGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  calendarDayCell: {
-    width: `${100 / 7}%`,
-    alignItems: 'center',
-    marginVertical: 4,
-    minHeight: 48,
-  },
-  calendarCircle: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  calendarDayText: {
-    fontSize: 13,
-    color: '#181C20',
-    fontWeight: 'bold',
-  },
-  calendarCalsText: {
-    fontSize: 11,
+  deleteButton: {
     color: '#ED2737',
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
   },
   progressBarBgSmall: {
     flex: 2,
@@ -876,76 +547,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginHorizontal: 8,
     overflow: 'hidden',
-  },
-  muscleSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
-  muscleHeader: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#181C20',
-  },
-  info: {
-    fontSize: 10,
-    textAlign: 'center',
-  },
-  muscleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    gap: 12,
-  },
-  muscleBarContainerHalf: {
-    flex: 1,
-    borderRadius: 12,
-  },
-  muscleBoxContent: {
-    padding: 6,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-  },
-  muscleName: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 4,
-    color: '#444',
-    textTransform: 'capitalize',
-  },
-  musclePercent: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#222',
-  },
-  muscleProgressBarBg: {
-    width: '100%',
-    height: 16,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 8,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  muscleProgressBarFill: {
-    height: '100%',
-    borderRadius: 8,
-  },
-  musclePercentContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2,
   },
 });
