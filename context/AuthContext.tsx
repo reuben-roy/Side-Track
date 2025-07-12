@@ -4,7 +4,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -38,29 +38,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     iosClientId: '897139169717-gaofu293j0te8rkc3jb414ad1ljl3qra.apps.googleusercontent.com', // TODO: Replace with your iOS client ID
     androidClientId: '897139169717-a6o7mdomn8hat59v64t3hq5rjlt1m385.apps.googleusercontent.com', // TODO: Replace with your Android client ID
     clientId: '897139169717-nvsgi01c5qlb1l1iahdbbanifig0tali.apps.googleusercontent.com', // Web client ID for localhost testing
-    redirectUri: makeRedirectUri({
-      scheme: 'sidetrack',
-      path: 'auth/callback'
-    }),
+    redirectUri: Platform.OS === 'web' 
+      ? 'https://sidetrack.aureole10.com/auth/callback'
+      : makeRedirectUri({
+          scheme: 'sidetrack',
+          path: 'auth/callback'
+        }),
   });
 
   useEffect(() => {
+    console.log('Auth response received:', response);
+    
     if (response?.type === 'success') {
       const { authentication } = response;
-      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${authentication?.accessToken}` },
-      })
-        .then(res => res.json())
-        .then(data => {
-          setUser({
-            id: data.sub,
-            name: data.name,
-            email: data.email,
-            photoUrl: data.picture,
-            provider: 'google',
+      console.log('Authentication object:', authentication);
+      
+      if (authentication?.accessToken) {
+        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${authentication.accessToken}` },
+        })
+          .then(res => {
+            console.log('Userinfo response status:', res.status);
+            return res.json();
+          })
+          .then(data => {
+            console.log('User data received:', data);
+            setUser({
+              id: data.sub,
+              name: data.name,
+              email: data.email,
+              photoUrl: data.picture,
+              provider: 'google',
+            });
+            router.replace('/(tabs)');
+          })
+          .catch(error => {
+            console.error('Error fetching user info:', error);
+            alert('Failed to fetch user information');
           });
-          router.replace('/(tabs)');
-        });
+      } else {
+        console.error('No access token in response');
+        alert('Authentication failed: No access token received');
+      }
+    } else if (response?.type === 'error') {
+      console.error('Auth error:', response.error);
+      alert(`Authentication failed: ${response.error?.message || 'Unknown error'}`);
     }
   }, [response]);
 
