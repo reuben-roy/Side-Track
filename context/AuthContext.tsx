@@ -6,7 +6,10 @@ import * as WebBrowser from 'expo-web-browser';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Platform, Text, View } from 'react-native';
 
-WebBrowser.maybeCompleteAuthSession();
+// Complete the auth session for web
+if (Platform.OS === 'web') {
+  WebBrowser.maybeCompleteAuthSession();
+}
 
 type AuthUser = {
   id: string;
@@ -44,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           scheme: 'sidetrack',
           path: 'auth/callback'
         }),
+    scopes: ['openid', 'profile', 'email'],
   });
 
   useEffect(() => {
@@ -70,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               photoUrl: data.picture,
               provider: 'google',
             });
-            router.replace('/(tabs)');
+            // Don't navigate here - let the callback route handle it
           })
           .catch(error => {
             console.error('Error fetching user info:', error);
@@ -87,7 +91,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [response]);
 
   const loginWithGoogle = async () => {
-    await promptAsync({ showInRecents: true });
+    try {
+      console.log('Starting Google login...');
+      const result = await promptAsync({ 
+        showInRecents: true
+      });
+      console.log('Google login result:', result);
+    } catch (error) {
+      console.error('Google login error:', error);
+      alert('Failed to start Google authentication');
+    }
   };
 
   const loginWithApple = async () => {

@@ -45,6 +45,7 @@ function AppLayout() {
             <Stack.Screen name="signup" options={{ headerShown: false }} />
           </>
         )}
+        <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
