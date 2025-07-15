@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     androidClientId: '897139169717-a6o7mdomn8hat59v64t3hq5rjlt1m385.apps.googleusercontent.com', // TODO: Replace with your Android client ID
     clientId: '897139169717-nvsgi01c5qlb1l1iahdbbanifig0tali.apps.googleusercontent.com', // Web client ID for localhost testing
     redirectUri: Platform.OS === 'web' 
-      ? 'https://sidetrack.aureole10.com/auth/callback'
+      ? 'https://sidetrack.explosion.fun/auth/callback'
       : makeRedirectUri({
           scheme: 'sidetrack',
           path: 'auth/callback'

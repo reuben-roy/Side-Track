@@ -38,6 +38,12 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-web-browser",
+        {
+          "experimentalLauncherActivity": true
+        }
       ]
     ],
     "experiments": {
@@ -48,6 +54,7 @@
       "eas": {
         "projectId": "484b03aa-caa4-499f-81c8-0ebcf4137278"
       }
-    }
+    },
+    "owner": "reuben10"
   }
 }
