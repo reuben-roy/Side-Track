@@ -33,6 +33,7 @@
     "expo-linear-gradient": "~14.1.5",
     "expo-linking": "~7.1.5",
     "expo-router": "^5.1.3",
+    "expo-secure-store": "~14.2.3",
     "expo-splash-screen": "^0.30.10",
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",

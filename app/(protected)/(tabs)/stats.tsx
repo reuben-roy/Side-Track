@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import CaloriesChart from '../../components/CaloriesChart';
-import MuscleCapacitySection from '../../components/MuscleCapacitySection';
-import ProfileButton from '../../components/ProfileButton';
-import { exercises } from '../../constants/Exercises';
+import CaloriesChart from '../../../components/CaloriesChart';
+import MuscleCapacitySection from '../../../components/MuscleCapacitySection';
+import ProfileButton from '../../../components/ProfileButton';
+import { exercises } from '../../../constants/Exercises';
 
 interface WorkoutLog {
   exercise: string;

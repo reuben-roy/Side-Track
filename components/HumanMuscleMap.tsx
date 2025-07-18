@@ -83,7 +83,8 @@ const MUSCLE_DATA = {
     outline: 'M100 5 C 50 5, 45 40, 50 80 S 40 150, 60 220 S 70 350, 100 395 S 130 350, 140 220 S 160 150, 150 80 S 150 5, 100 5 Z',
     muscles: {
       traps: { name: 'Traps', path: 'M80 50 C 60 50, 60 80, 65 95 L 80 120 L 95 95 C 100 80, 100 50, 80 50 Z' },
-      lats: { name: 'Lats', path: [
+      lats: {
+        name: 'Lats', path: [
         // Left lat (25% smaller, centered)
         'M34 100 Q48 88 62 91 Q76 94 79 112 Q81 129 74 143 Q62 155 47 152 Q32 147 29 132 Q26 117 29 111 Q29 108 33 105 Z',
         // Right lat (25% smaller, centered)
@@ -96,7 +97,8 @@ const MUSCLE_DATA = {
         'M62 94 Q72 102 79 112 Q81 123 73 141',
         // Inner edge detail (right, smaller)
         'M82 141 Q86 123 89 112 Q96 102 106 94'
-      ] },
+        ]
+      },
       triceps: { name: 'Triceps', path: 'M7 95 C 5 130, 15 135, 20 130 L 30 90 C 25 95, 15 95, 7 95 Z M143 95 C 145 130, 135 135, 130 130 L 120 90 C 125 95, 135 95, 143 95 Z' },
       glutes: { name: 'Glutes', path: 'M40 170 C 50 165, 60 175, 70 205 L 40 205 Z M110 170 C 100 165, 90 175, 80 205 L 110 205 Z' },
       hamstrings: { 

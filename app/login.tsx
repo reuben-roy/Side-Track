@@ -5,19 +5,19 @@ import React from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const LoginScreen = () => {
-  const { loginWithGoogle, loginWithApple } = useAuth()!;
+  const authContext = useAuth();
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Login</Text>
 
-        <TouchableOpacity style={styles.socialButton} onPress={loginWithGoogle}>
+        <TouchableOpacity style={styles.socialButton} onPress={authContext?.loginWithGoogle}>
           <Ionicons name="logo-google" size={24} color="#fff" />
           <Text style={styles.socialButtonText}>Login with Google</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.socialButton} onPress={loginWithApple}>
+        <TouchableOpacity style={styles.socialButton} onPress={authContext?.loginWithApple}>
           <Ionicons name="logo-apple" size={24} color="#fff" />
           <Text style={styles.socialButtonText}>Login with Apple</Text>
         </TouchableOpacity>

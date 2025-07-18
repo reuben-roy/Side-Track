@@ -3,9 +3,9 @@ import SlotPicker from '@/components/SlotPicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { exercises } from '../../constants/Exercises';
-import { muscleGroups } from '../../constants/MuscleGroups';
-import { calculateCapacityDrain } from '../../helper/utils';
+import { exercises } from '../../../constants/Exercises';
+import { muscleGroups } from '../../../constants/MuscleGroups';
+import { calculateCapacityDrain } from '../../../helper/utils';
 
 interface WorkoutScreenProps {
   exercise: string;

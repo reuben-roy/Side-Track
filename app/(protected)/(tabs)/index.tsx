@@ -1,7 +1,7 @@
 import ProfileButton from '@/components/ProfileButton';
 import React, { useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
-import { exercises } from '../../constants/Exercises';
+import { exercises } from '../../../constants/Exercises';
 import WorkoutScreen from './WorkoutScreen';
 
 const ITEM_HEIGHT = 48;
