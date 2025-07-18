@@ -1,37 +1,26 @@
 import {
-    COOKIE_MAX_AGE,
-    COOKIE_NAME,
-    COOKIE_OPTIONS,
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI,
-    JWT_EXPIRATION_TIME,
-    JWT_SECRET,
-    REFRESH_COOKIE_NAME,
-    REFRESH_COOKIE_OPTIONS,
-    REFRESH_TOKEN_EXPIRY,
+  COOKIE_MAX_AGE,
+  COOKIE_NAME,
+  COOKIE_OPTIONS,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  GOOGLE_REDIRECT_URI,
+  JWT_EXPIRATION_TIME,
+  JWT_SECRET,
+  REFRESH_COOKIE_NAME,
+  REFRESH_COOKIE_OPTIONS,
+  REFRESH_TOKEN_EXPIRY,
 } from "@/constants/GlobalConstants";
 import * as jose from "jose";
 
 export async function POST(request: Request) {
   let body;
-  try {
-    console.log(1);
-    body = await request.json();
-    console.log('Request body parsed successfully:', body);
-  } catch (error) {
-    console.error('Error parsing request body:', error);
-    return Response.json(
-      { error: "Invalid request body format" },
-      { status: 400 }
-    );
-  }
-  
-  const code = body.code as string;
-  const platform = body.platform as string || "native";
-  const codeVerifier = body.code_verifier;
-  
-  console.log('Extracted from body:', { code, platform, codeVerifier: codeVerifier ? 'present' : 'missing' });
+  body = await request.formData();
+  const code = body.get('code') as string;
+  const platform = body.get('Platform') as string || "native";
+  const codeVerifier = body.get('code_verifier');
+
+  // console.log('Extracted from body:', { code, platform, codeVerifier: codeVerifier ? 'present' : 'missing' });
 
   if (!code) {
     return Response.json(
@@ -40,13 +29,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Log the actual values being used
-  console.log("OAuth Configuration:", {
-    GOOGLE_CLIENT_ID,
-    GOOGLE_REDIRECT_URI,
-    BASE_URL: process.env.EXPO_PUBLIC_BASE_URL
-  });
-  
   // Build the token request parameters
   const params: Record<string, string> = {
     client_id: GOOGLE_CLIENT_ID,
@@ -55,7 +37,7 @@ export async function POST(request: Request) {
     grant_type: "authorization_code",
     code: code,
   };
-  
+
   // Add code_verifier if provided (required for PKCE)
   if (codeVerifier) {
     params.code_verifier = codeVerifier;
@@ -65,22 +47,22 @@ export async function POST(request: Request) {
   }
 
   console.log("Sending request to Google with params:", params);
-  
+
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params),
   });
 
-  console.log("Google token response status:", response.status);
+  console.log("Google token response status:", response, '\nresponse status', response.status);
   const data = await response.json();
   console.log("Google token response data:", data);
 
   if (!data.id_token) {
     console.error("Google OAuth error:", data);
     return Response.json(
-      { 
-        error: "Missing required parameters", 
+      {
+        error: "Missing required parameters",
         details: data.error || "Unknown error",
         description: data.error_description || "No description provided"
       },
@@ -156,31 +138,28 @@ export async function POST(request: Request) {
     // Set the access token in an HTTP-only cookie
     response.headers.set(
       "Set-Cookie",
-      `${COOKIE_NAME}=${accessToken}; Max-Age=${COOKIE_OPTIONS.maxAge}; Path=${
-        COOKIE_OPTIONS.path
-      }; ${COOKIE_OPTIONS.httpOnly ? "HttpOnly;" : ""} ${
-        COOKIE_OPTIONS.secure ? "Secure;" : ""
+      `${COOKIE_NAME}=${accessToken}; Max-Age=${COOKIE_OPTIONS.maxAge}; Path=${COOKIE_OPTIONS.path
+      }; ${COOKIE_OPTIONS.httpOnly ? "HttpOnly;" : ""} ${COOKIE_OPTIONS.secure ? "Secure;" : ""
       } SameSite=${COOKIE_OPTIONS.sameSite}`
     );
 
     // Set the refresh token in a separate HTTP-only cookie
     response.headers.append(
       "Set-Cookie",
-      `${REFRESH_COOKIE_NAME}=${refreshToken}; Max-Age=${
-        REFRESH_COOKIE_OPTIONS.maxAge
-      }; Path=${REFRESH_COOKIE_OPTIONS.path}; ${
-        REFRESH_COOKIE_OPTIONS.httpOnly ? "HttpOnly;" : ""
-      } ${REFRESH_COOKIE_OPTIONS.secure ? "Secure;" : ""} SameSite=${
-        REFRESH_COOKIE_OPTIONS.sameSite
+      `${REFRESH_COOKIE_NAME}=${refreshToken}; Max-Age=${REFRESH_COOKIE_OPTIONS.maxAge
+      }; Path=${REFRESH_COOKIE_OPTIONS.path}; ${REFRESH_COOKIE_OPTIONS.httpOnly ? "HttpOnly;" : ""
+      } ${REFRESH_COOKIE_OPTIONS.secure ? "Secure;" : ""} SameSite=${REFRESH_COOKIE_OPTIONS.sameSite
       }`
     );
 
     return response;
   }
 
+  console.log(`this  platform would be consideered not web: ${platform}`)
   // For native platforms, return both tokens in the response body
   return Response.json({
-    accessToken,
-    refreshToken,
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    token_type: "Bearer",
   });
 }

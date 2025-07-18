@@ -1,11 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Svg, { Image, Path } from 'react-native-svg';
 
@@ -24,8 +24,8 @@ const MUSCLE_DATA = {
   front: {
     outline: 'M100 5 C 50 5, 45 40, 50 80 S 40 150, 60 220 S 70 350, 100 395 S 130 350, 140 220 S 160 150, 150 80 S 150 5, 100 5 Z',
     muscles: {
-      chest: { 
-        name: 'Chest', 
+      chest: {
+        name: 'Chest',
         path: [
           // Left pectoralis major (15px left, 30px up)
           'M50 60 C 40 65, 35 75, 33 85 C 31 95, 33 105, 37 110 C 41 115, 47 117, 53 115 C 59 113, 63 108, 65 105 C 67 102, 67 98, 65 95 C 63 92, 59 90, 55 88 C 51 86, 47 85, 50 60 Z',
@@ -62,8 +62,8 @@ const MUSCLE_DATA = {
           'M120 95 Q130 90 140 95 Q145 105 145 120 Q145 135 140 145 Q135 150 130 150 Q125 150 120 145 Q115 135 115 120 Q115 105 120 95 Z'
         ]
       },
-      quadriceps: { 
-        name: 'Quadriceps', 
+      quadriceps: {
+        name: 'Quadriceps',
         path: [
           // Left quadriceps (up 10px, 5px left)
           'M45 210 Q60 208 67 215 Q70 225 70 240 Q70 255 67 265 Q63 270 60 270 Q53 270 45 265 Q40 255 40 240 Q40 225 45 210 Z',
@@ -85,24 +85,24 @@ const MUSCLE_DATA = {
       traps: { name: 'Traps', path: 'M80 50 C 60 50, 60 80, 65 95 L 80 120 L 95 95 C 100 80, 100 50, 80 50 Z' },
       lats: {
         name: 'Lats', path: [
-        // Left lat (25% smaller, centered)
-        'M34 100 Q48 88 62 91 Q76 94 79 112 Q81 129 74 143 Q62 155 47 152 Q32 147 29 132 Q26 117 29 111 Q29 108 33 105 Z',
-        // Right lat (25% smaller, centered)
-        'M79 112 Q81 94 95 91 Q109 88 123 100 Q127 103 127 108 Q130 117 127 132 Q124 147 109 152 Q94 155 82 143 Q75 129 77 112 Q75 94 79 112 Z',
-        // Muscle fiber definition (left, smaller)
-        'M33 111 Q47 99 61 115 Q73 126 73 141 Q70 152 61 155',
-        // Muscle fiber definition (right, smaller)
-        'M109 155 Q100 152 97 141 Q100 126 112 115 Q126 99 117 111',
-        // Inner edge detail (left, smaller)
-        'M62 94 Q72 102 79 112 Q81 123 73 141',
-        // Inner edge detail (right, smaller)
-        'M82 141 Q86 123 89 112 Q96 102 106 94'
+          // Left lat (25% smaller, centered)
+          'M34 100 Q48 88 62 91 Q76 94 79 112 Q81 129 74 143 Q62 155 47 152 Q32 147 29 132 Q26 117 29 111 Q29 108 33 105 Z',
+          // Right lat (25% smaller, centered)
+          'M79 112 Q81 94 95 91 Q109 88 123 100 Q127 103 127 108 Q130 117 127 132 Q124 147 109 152 Q94 155 82 143 Q75 129 77 112 Q75 94 79 112 Z',
+          // Muscle fiber definition (left, smaller)
+          'M33 111 Q47 99 61 115 Q73 126 73 141 Q70 152 61 155',
+          // Muscle fiber definition (right, smaller)
+          'M109 155 Q100 152 97 141 Q100 126 112 115 Q126 99 117 111',
+          // Inner edge detail (left, smaller)
+          'M62 94 Q72 102 79 112 Q81 123 73 141',
+          // Inner edge detail (right, smaller)
+          'M82 141 Q86 123 89 112 Q96 102 106 94'
         ]
       },
       triceps: { name: 'Triceps', path: 'M7 95 C 5 130, 15 135, 20 130 L 30 90 C 25 95, 15 95, 7 95 Z M143 95 C 145 130, 135 135, 130 130 L 120 90 C 125 95, 135 95, 143 95 Z' },
       glutes: { name: 'Glutes', path: 'M40 170 C 50 165, 60 175, 70 205 L 40 205 Z M110 170 C 100 165, 90 175, 80 205 L 110 205 Z' },
-      hamstrings: { 
-        name: 'Hamstrings', 
+      hamstrings: {
+        name: 'Hamstrings',
         path: [
           // Left hamstring (up 10px, 5px left from previous)
           'M45 195 Q60 192 67 198 Q70 210 70 230 Q70 250 67 265 Q64 270 60 270 Q53 270 45 265 Q40 250 40 230 Q40 210 45 195 Z',
@@ -119,7 +119,7 @@ const MUSCLE_DATA = {
     },
   },
   side: {
-     outline: 'M100 5 C 120 5, 130 40, 120 80 S 90 150, 100 220 S 90 350, 100 395 L 95 395 C 85 350, 95 220, 80 150 S 110 40, 100 5 Z',
+    outline: 'M100 5 C 120 5, 130 40, 120 80 S 90 150, 100 220 S 90 350, 100 395 L 95 395 C 85 350, 95 220, 80 150 S 110 40, 100 5 Z',
     muscles: {
       shoulders_side: { name: 'Shoulders', path: 'M120 80 C 140 90, 135 115, 118 115 C 125 105, 125 90, 120 80 Z' },
       chest_side: { name: 'Chest', path: 'M118 115 C 125 125, 125 135, 120 140 L 110 140 C 112 130, 115 120, 118 115 Z' },
@@ -130,8 +130,8 @@ const MUSCLE_DATA = {
   },
   common: {
     muscles: {
-      calves: { 
-        name: 'Calves', 
+      calves: {
+        name: 'Calves',
         path: [
           // Left calf (up 10px, net 5px left)
           'M50 285 Q60 280 70 285 Q75 295 75 315 Q75 335 70 355 Q65 365 60 365 Q55 365 50 355 Q45 335 45 315 Q45 295 50 285 Z',
@@ -156,7 +156,7 @@ interface MuscleProps {
 }
 
 // --- Reusable Muscle Component (Memoized & Improved UX) ---
-const Muscle = React.memo(({ path, name, muscleId, isSelected, onPress }: MuscleProps) => (
+const Muscle = React.memo(({ path, muscleId, isSelected, onPress }: MuscleProps) => (
   <Path
     d={path}
     fill={isSelected ? CONFIG.SELECTED_COLOR : CONFIG.UNSELECTED_COLOR}
@@ -165,6 +165,8 @@ const Muscle = React.memo(({ path, name, muscleId, isSelected, onPress }: Muscle
     onPress={() => onPress(muscleId)}
   />
 ));
+
+Muscle.displayName = 'Muscle';
 
 interface BodyViewProps {
   view: 'front' | 'back' | 'side';
@@ -226,6 +228,8 @@ const BodyView = React.memo(({ view, selectedMuscles, onMusclePress }: BodyViewP
   );
 });
 
+BodyView.displayName = 'BodyView';
+
 // --- Main App Component ---
 export default function HumanMuscleMap() {
   const [selectedMuscles, setSelectedMuscles] = useState<Set<string>>(new Set());
@@ -245,7 +249,7 @@ export default function HumanMuscleMap() {
   const resetSelection = useCallback(() => {
     setSelectedMuscles(new Set());
   }, []);
-  
+
   const muscleNameMap = useMemo(() => {
     const map = new Map<string, string>();
     Object.values(MUSCLE_DATA).forEach(view => {

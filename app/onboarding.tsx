@@ -8,7 +8,7 @@ import OnboardingCarousel from '@/components/OnboardingCarousel';
 export default function OnboardingScreen() {
   const handleOnboardingComplete = async () => {
     await AsyncStorage.setItem('onboardingComplete', 'true');
-    router.replace('/(tabs)');
+    router.replace('/(protected)/(tabs)');
   };
 
   return (

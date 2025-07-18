@@ -1,4 +1,4 @@
-import { BASE_URL, TOKEN_KEY_NAME } from '@/constants/GlobalConstants';
+import { BASE_URL, GOOGLE_CLIENT_SECRET, TOKEN_KEY_NAME } from '@/constants/GlobalConstants';
 import { tokenCache } from '@/helper/cache';
 import { AuthError, AuthRequestConfig, DiscoveryDocument, exchangeCodeAsync, makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
@@ -36,7 +36,6 @@ const config: AuthRequestConfig = {
   clientId: "google",
   scopes: ["openid", "profile", "email"],
   redirectUri: makeRedirectUri(),
-  usePKCE: true,
 };
 
 const appleConfig: AuthRequestConfig = {
@@ -72,7 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (response?.type === "success") {
       try {
         setLoading(true);
+        console.log('expecto', response);
         const { code } = response.params;
+        console.log("request", request);
 
         // For web, handle the COOP issue by using a different approach
         if (isWeb) {
@@ -103,8 +104,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               code: code,
               extraParams: {
                 Platform: Platform.OS,
+                // code_verifier: request?.codeVerifier as string,
               },
               clientId: "google",
+              clientSecret: GOOGLE_CLIENT_SECRET,
               redirectUri: makeRedirectUri(),
             },
             discovery
@@ -123,7 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const sessionData = await sessionResponse.json();
               setUser(sessionData as AuthUser);
             }
-            console.log(1)
           } else {
             const accessToken = tokenResponse.accessToken;
             if (!accessToken) {
@@ -139,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(decoded as AuthUser);
           }
         }
-       } catch (e) {
+      } catch (e) {
           console.error("Error handling auth response:", e);
         } finally {
           setLoading(false);
@@ -158,10 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     //   clientId: '897139169717-nvsgi01c5qlb1l1iahdbbanifig0tali.apps.googleusercontent.com', // Web client ID for localhost testing
     //   redirectUri: Platform.OS === 'web' 
     //     ? 'https://sidetrack.explosion.fun/auth/callback'
-    //     : makeRedirectUri({
-    //         scheme: 'sidetrack',
-    //         path: 'auth/callback'
-    //       }),
+    //     : makeRedirectUri(),
     //   scopes: ['openid', 'profile', 'email'],
     // });
 

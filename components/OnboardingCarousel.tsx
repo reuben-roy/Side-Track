@@ -50,7 +50,7 @@ export default function OnboardingCarousel({ onComplete }: OnboardingCarouselPro
       onComplete();
     } else {
       // If no onComplete prop, navigate to main app
-      router.replace('/(tabs)');
+      router.replace('/(protected)/(tabs)');
     }
   };
 
