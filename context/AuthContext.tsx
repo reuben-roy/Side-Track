@@ -1,6 +1,7 @@
 import { BASE_URL, GOOGLE_CLIENT_SECRET, TOKEN_KEY_NAME } from '@/constants/GlobalConstants';
 import { tokenCache } from '@/helper/cache';
 import { AuthError, AuthRequestConfig, DiscoveryDocument, exchangeCodeAsync, makeRedirectUri, useAuthRequest } from 'expo-auth-session';
+import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as jose from 'jose';
 import React, { createContext, useContext, useState } from 'react';
@@ -71,11 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (response?.type === "success") {
       try {
         setLoading(true);
-        console.log('expecto', response);
         const { code } = response.params;
-        console.log("request", request);
 
-        // For web, handle the COOP issue by using a different approach
         if (isWeb) {
           // Send the code to your backend to handle the token exchange server-side
           const tokenExchangeResponse = await fetch(`${BASE_URL}/api/auth/token`, {
@@ -97,6 +95,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           const tokenData = await tokenExchangeResponse.json();
           console.log('token response', tokenData);
+
+
+          // todo: what are we doing with the token data after we retrieve it?
+          // could be nothing, then this could be a major issue right here.
         } else {
           // For native platforms, use the standard expo-auth-session flow
           const tokenResponse = await exchangeCodeAsync(
@@ -139,73 +141,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             const decoded = jose.decodeJwt(accessToken);
             setUser(decoded as AuthUser);
+            // await AsyncStorage.setItem('onboardingComplete', 'true');
+            router.replace('/(protected)/(tabs)');
           }
         }
       } catch (e) {
-          console.error("Error handling auth response:", e);
-        } finally {
-          setLoading(false);
-        }
-      } else if (response?.type === "cancel") {
-        alert("Sign in cancelled");
-      } else if (response?.type === "error") {
-        setError(response?.error as AuthError);
+        console.error("Error handling auth response:", e);
+      } finally {
+        setLoading(false);
       }
+    } else if (response?.type === "cancel") {
+      alert("Sign in cancelled");
+    } else if (response?.type === "error") {
+      setError(response?.error as AuthError);
     }
-
-    // // Google AuthSession setup
-    // const [request, response, promptAsync] = Google.useAuthRequest({
-    //   iosClientId: '897139169717-gaofu293j0te8rkc3jb414ad1ljl3qra.apps.googleusercontent.com', // TODO: Replace with your iOS client ID
-    //   androidClientId: '897139169717-a6o7mdomn8hat59v64t3hq5rjlt1m385.apps.googleusercontent.com', // TODO: Replace with your Android client ID
-    //   clientId: '897139169717-nvsgi01c5qlb1l1iahdbbanifig0tali.apps.googleusercontent.com', // Web client ID for localhost testing
-    //   redirectUri: Platform.OS === 'web' 
-    //     ? 'https://sidetrack.explosion.fun/auth/callback'
-    //     : makeRedirectUri(),
-    //   scopes: ['openid', 'profile', 'email'],
-    // });
-
-    // useEffect(() => {
-    //   console.log('Auth response received:', response);
-
-    //   if (response?.type === 'success') {
-    //     const { authentication } = response;
-    //     console.log('Authentication object:', authentication);
-
-    //     if (authentication?.accessToken) {
-    //       fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-    //         headers: { Authorization: `Bearer ${authentication.accessToken}` },
-    //       })
-    //         .then(res => {
-    //           console.log('Userinfo response status:', res.status);
-    //           return res.json();
-    //         })
-    //         .then(async data => {
-    //           console.log('User data received:', data);
-    //           const userObj: AuthUser = {
-    //             id: data.sub,
-    //             name: data.name,
-    //             email: data.email,
-    //             photoUrl: data.picture,
-    //             provider: 'google',
-    //             accessToken: authentication.accessToken,
-    //           };
-    //           setUser(userObj);
-    //           await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userObj));
-    //           // Don't navigate here - let the callback route handle it
-    //         })
-    //         .catch(error => {
-    //           console.error('Error fetching user info:', error);
-    //           alert('Failed to fetch user information');
-    //         });
-    //     } else {
-    //       console.error('No access token in response');
-    //       alert('Authentication failed: No access token received');
-    //     }
-    //   } else if (response?.type === 'error') {
-    //     console.error('Auth error:', response.error);
-    //     alert(`Authentication failed: ${response.error?.message || 'Unknown error'}`);
-    //   }
-    // }, [response]);
+  }
 
     const loginWithGoogle = async () => {
       console.log("signIn");
@@ -227,58 +177,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // const loginWithGoogle = async () => {
-    //   try {
-    //     console.log('Starting Google login...');
-    //     const result = await promptAsync({ 
-    //       showInRecents: true
-    //     });
-    //     console.log('Google login result:', result);
-    //   } catch (error) {
-    //     console.error('Google login error:', error);
-    //     alert('Failed to start Google authentication');
-    //   }
-    // };
-
     const loginWithApple = async () => { };
 
-    const logout = async () => { }
-    //   setUser(null);
-    //   await SecureStore.deleteItemAsync(USER_KEY);
-    //   router.replace('/login');
-    // };
+    const logout = async () => {
+      setLoading(true);
+      tokenCache?.deleteToken(TOKEN_KEY_NAME);
+      setUser(null);
+      router.replace('/login');
+      setLoading(false);
+    };
 
-    const fetchWithAuth = async (input: RequestInfo, init: RequestInit = {}) => { }
-    //   let token = user?.accessToken;
-    //   if (!token && user) {
-    //     // Try to restore from SecureStore if not in memory
-    //     const userData = await SecureStore.getItemAsync(USER_KEY);
-    //     if (userData) {
-    //       const storedUser = JSON.parse(userData);
-    //       token = storedUser.accessToken;
-    //     }
-    //   }
-    //   if (!token) {
-    //     throw new Error('No access token available');
-    //   }
-    //   const headers = {
-    //     ...(init.headers || {}),
-    //     Authorization: `Bearer ${token}`,
-    //   };
-    //   return fetch(input, { ...init, headers });
-    // };
+    const fetchWithAuth = async (input: RequestInfo, init: RequestInit = {}) => {
+      let token = user?.accessToken;
+      if (!token && user) {
+        const userData = await tokenCache?.getToken(TOKEN_KEY_NAME)
+        if (userData) {
+          const storedUser = JSON.parse(userData);
+          token = storedUser.accessToken;
+        }
+      }
+      if (!token) {
+        throw new Error('No access token available');
+      }
+      const headers = {
+        ...(init.headers || {}),
+        Authorization: `Bearer ${token}`,
+      };
+      return fetch(input, { ...init, headers });
+    };
 
     return (
       <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginWithApple, logout, fetchWithAuth, error: null }}>
         {children}
       </AuthContext.Provider>
     );
-  }
+}
 
-  export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (!context) {
-      throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
-  };
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

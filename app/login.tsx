@@ -1,8 +1,9 @@
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React from 'react';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 const LoginScreen = () => {
   const authContext = useAuth();
@@ -10,6 +11,9 @@ const LoginScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
+        <Image source={require('@/assets/images/onboarding-bg.jpg')} style={styles.image} resizeMode="cover" />
+        <Text style={styles.headline}>Welcome to Side-Track</Text>
+        <Text style={styles.subtitle}>Your personal fitness companion</Text>
         <Text style={styles.title}>Login</Text>
 
         <TouchableOpacity style={styles.socialButton} onPress={authContext?.loginWithGoogle}>
@@ -20,16 +24,6 @@ const LoginScreen = () => {
         <TouchableOpacity style={styles.socialButton} onPress={authContext?.loginWithApple}>
           <Ionicons name="logo-apple" size={24} color="#fff" />
           <Text style={styles.socialButtonText}>Login with Apple</Text>
-        </TouchableOpacity>
-
-        <View style={styles.orContainer}>
-          <View style={styles.line} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.line} />
-        </View>
-
-        <TouchableOpacity onPress={() => router.push('/signup')}>
-          <Text style={styles.signupText}>Don't have an account? Sign Up</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -87,6 +81,24 @@ const styles = StyleSheet.create({
     color: '#B6F533',
     textAlign: 'center',
     marginTop: 24,
+  },
+  headline: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  image: {
+    width: width - 48,
+    height: 320,
+    borderRadius: 16,
+    marginBottom: 32,
   },
 });
 

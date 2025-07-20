@@ -21,6 +21,12 @@ export default function RootLayout() {
                         animation: "none"
                     }}
                 />
+                <Stack.Screen
+                    name="+not-found"
+                    options={{
+                        headerShown: false
+                    }}
+                />
             </Stack>
         </AuthProvider>
     )
