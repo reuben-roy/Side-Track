@@ -27,8 +27,8 @@ export default function ProtectedLayout() {
     })();
   }, []);
 
-  if (showOnboarding === null) {
-    return null;
+  if (showOnboarding) {
+    return <Redirect href="/onboarding" />;
   }
 
   return (
