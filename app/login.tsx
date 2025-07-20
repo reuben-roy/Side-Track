@@ -7,15 +7,17 @@ const { width } = Dimensions.get('window');
 
 const LoginScreen = () => {
   const authContext = useAuth();
-
+  
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Image source={require('@/assets/images/onboarding-bg.jpg')} style={styles.image} resizeMode="cover" />
-        <Text style={styles.headline}>Welcome to Side-Track</Text>
-        <Text style={styles.subtitle}>Your personal fitness companion</Text>
-        <Text style={styles.title}>Login</Text>
-
+        <Image source={require('@/assets/images/onboarding.webp')} style={styles.image} resizeMode="cover" />
+        <Text style={styles.title}>SideTrack</Text>
+        <View style={styles.subtitleContainer}>
+          <Text style={styles.subtitle}>Weaponized against you</Text>
+          <Text style={styles.subtitle}>To bring out the best in you</Text>
+        </View>
+        
         <TouchableOpacity style={styles.socialButton} onPress={authContext?.loginWithGoogle}>
           <Ionicons name="logo-google" size={24} color="#fff" />
           <Text style={styles.socialButtonText}>Login with Google</Text>
@@ -45,7 +47,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
-    marginBottom: 32,
   },
   socialButton: {
     flexDirection: 'row',
@@ -82,24 +83,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 24,
   },
-  headline: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
   subtitle: {
-    fontSize: 16,
+    fontSize: 12,
     color: '#888',
     textAlign: 'center',
-    marginBottom: 24,
   },
   image: {
     width: width - 48,
-    height: 320,
+    height: width - 48,
     borderRadius: 16,
     marginBottom: 32,
+    marginHorizontal: 'auto',
   },
+  subtitleContainer: {
+    marginBottom: 32
+  }
 });
 
 export default LoginScreen;
