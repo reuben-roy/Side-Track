@@ -10,12 +10,12 @@ import { Platform } from 'react-native';
 WebBrowser.maybeCompleteAuthSession();
 
 type AuthUser = {
-  id: string;
+  sub: string;
   name?: string;
   email?: string;
-  photoUrl?: string;
-  givenName?: string;
-  familyName?: string;
+  picture?: string;
+  given_name?: string;
+  family_name?: string;
   emailVerified?: boolean;
   exp?: number;
   cookieExpiration?: number;
@@ -68,82 +68,163 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     handleResponse();
   }, [response])
 
+  React.useEffect(() => {
+    const restoreSession = async () => {
+      setLoading(true);
+      try {
+        if (isWeb) {
+          // For web: Check if we have a session cookie by making a request to a session endpoint
+          const sessionResponse = await fetch(`${BASE_URL}/api/auth/session`, {
+            method: "GET",
+            credentials: "include", // Important: This includes cookies in the request
+          });
+
+          if (sessionResponse.ok) {
+            const userData = await sessionResponse.json();
+            setUser(userData as AuthUser);
+          } else {
+            console.log("No active web session found");
+
+            // Try to refresh the token using the refresh cookie
+            // try {
+            //   await refreshAccessToken();
+            // } catch (e) {
+            //   console.log("Failed to refresh token on startup");
+            // }
+          }
+        } else {
+          // For native: Try to use the stored access token first
+          const storedAccessToken = await tokenCache?.getToken("accessToken");
+          const storedRefreshToken = await tokenCache?.getToken("refreshToken");
+
+          console.log(
+            "Restoring session - Access token:",
+            storedAccessToken ? "exists" : "missing"
+          );
+          console.log(
+            "Restoring session - Refresh token:",
+            storedRefreshToken ? "exists" : "missing"
+          );
+
+          if (storedAccessToken) {
+            try {
+              // Check if the access token is still valid
+              const decoded = jose.decodeJwt(storedAccessToken);
+              const exp = (decoded as any).exp;
+              const now = Math.floor(Date.now() / 1000);
+
+              if (exp && exp > now) {
+                // Access token is still valid
+                console.log("Access token is still valid, using it");
+                setAccessToken(storedAccessToken);
+
+                if (storedRefreshToken) {
+                  setRefreshToken(storedRefreshToken);
+                }
+
+                setUser(decoded as AuthUser);
+              }
+              // else if (storedRefreshToken) {
+              //   // Access token expired, but we have a refresh token
+              //   console.log("Access token expired, using refresh token");
+              //   setRefreshToken(storedRefreshToken);
+              //   await refreshAccessToken(storedRefreshToken);
+              // }
+            } catch (e) {
+              console.error("Error decoding stored token:", e);
+
+              // Try to refresh using the refresh token
+              // if (storedRefreshToken) {
+              //   console.log("Error with access token, trying refresh token");
+              //   setRefreshToken(storedRefreshToken);
+              //   await refreshAccessToken(storedRefreshToken);
+              // }
+            }
+          }
+          // else if (storedRefreshToken) {
+          //   // No access token, but we have a refresh token
+          //   console.log("No access token, using refresh token");
+          //   setRefreshToken(storedRefreshToken);
+          //   await refreshAccessToken(storedRefreshToken);
+          // }
+          else {
+            console.log("User is not authenticated");
+          }
+        }
+      } catch (error) {
+        console.error("Error restoring session:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, [isWeb]);
+
   async function handleResponse() {
     if (response?.type === "success") {
       try {
         setLoading(true);
         const { code } = response.params;
 
+        const tokenResponse = await exchangeCodeAsync(
+          {
+            code: code,
+            extraParams: {
+              Platform: Platform.OS,
+              // code_verifier: request?.codeVerifier as string,
+            },
+            clientId: "google",
+            clientSecret: GOOGLE_CLIENT_SECRET,
+            redirectUri: makeRedirectUri(),
+          },
+          discovery
+        );
+
+
         if (isWeb) {
           // Send the code to your backend to handle the token exchange server-side
-          const tokenExchangeResponse = await fetch(`${BASE_URL}/api/auth/token`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              code,
-              redirectUri: makeRedirectUri(),
-              platform: Platform.OS,
-            }),
+          const user = jose.decodeJwt(tokenResponse.accessToken) as AuthUser;
+          setUser(user);
+
+          const sessionResponse = await fetch(`${BASE_URL}/api/auth/session`, {
+            method: "GET",
+            credentials: "include",
           });
 
-          if (!tokenExchangeResponse.ok) {
-            throw new Error(`Token exchange failed: ${tokenExchangeResponse.status}`);
+          if (sessionResponse.ok) {
+            const sessionData = await sessionResponse.json();
+            setUser(sessionData as AuthUser);
           }
-
-          const tokenData = await tokenExchangeResponse.json();
-          console.log('token response', tokenData);
-
-
-          // todo: what are we doing with the token data after we retrieve it?
-          // could be nothing, then this could be a major issue right here.
+          
+          router.replace('/(protected)/(tabs)');
         } else {
           // For native platforms, use the standard expo-auth-session flow
-          const tokenResponse = await exchangeCodeAsync(
-            {
-              code: code,
-              extraParams: {
-                Platform: Platform.OS,
-                // code_verifier: request?.codeVerifier as string,
-              },
-              clientId: "google",
-              clientSecret: GOOGLE_CLIENT_SECRET,
-              redirectUri: makeRedirectUri(),
-            },
-            discovery
-          )
+          const newAccessToken = tokenResponse.accessToken;
+          const newRefreshToken = tokenResponse.refreshToken;
 
-          console.log('token response', tokenResponse)
-
-          if (isWeb) {
-            const sessionResponse = await fetch(`${BASE_URL}/api/auth/session`, {
-              method: 'GET',
-              credentials: 'include',
-            });
-            console.log('sessionResponse', sessionResponse)
-
-            if (sessionResponse.ok) {
-              const sessionData = await sessionResponse.json();
-              setUser(sessionData as AuthUser);
-            }
-          } else {
-            const accessToken = tokenResponse.accessToken;
-            if (!accessToken) {
-              console.log("Didn't get an access token");
-              return;
-            }
-            setAccessToken(accessToken);
-            console.log('access token', accessToken);
-
-            tokenCache?.saveToken(TOKEN_KEY_NAME, accessToken);
-
-            const decoded = jose.decodeJwt(accessToken);
+          console.log(
+            "Received initial access token:",
+            newAccessToken ? "exists" : "missing"
+          );
+          console.log(
+            "Received initial refresh token:",
+            newRefreshToken ? "exists" : "missing"
+          );
+          // Store tokens in state
+          if (newAccessToken) setAccessToken(newAccessToken);
+          if (newRefreshToken) setRefreshToken(newRefreshToken);
+          // Save tokens to secure storage for persistence
+          if (newAccessToken)
+            await tokenCache?.saveToken("accessToken", newAccessToken);
+          if (newRefreshToken)
+            await tokenCache?.saveToken("refreshToken", newRefreshToken);
+          // Decode the JWT access token to get user information
+          if (newAccessToken) {
+            const decoded = jose.decodeJwt(newAccessToken);
             setUser(decoded as AuthUser);
-            // await AsyncStorage.setItem('onboardingComplete', 'true');
-            router.replace('/(protected)/(tabs)');
           }
+          router.replace('/(protected)/(tabs)');
         }
       } catch (e) {
         console.error("Error handling auth response:", e);

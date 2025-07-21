@@ -20,8 +20,6 @@ export async function POST(request: Request) {
   const platform = body.get('Platform') as string || "native";
   const codeVerifier = body.get('code_verifier');
 
-  // console.log('Extracted from body:', { code, platform, codeVerifier: codeVerifier ? 'present' : 'missing' });
-
   if (!code) {
     return Response.json(
       { error: "Missing authorization code" },
@@ -46,20 +44,15 @@ export async function POST(request: Request) {
     console.log("No code_verifier provided");
   }
 
-  console.log("Sending request to Google with params:", params);
-
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params),
   });
 
-  console.log("Google token response status:", response, '\nresponse status', response.status);
   const data = await response.json();
-  console.log("Google token response data:", data);
 
   if (!data.id_token) {
-    console.error("Google OAuth error:", data);
     return Response.json(
       {
         error: "Missing required parameters",
@@ -91,7 +84,6 @@ export async function POST(request: Request) {
     .setSubject(sub)
     .setIssuedAt(issuedAt)
     .sign(new TextEncoder().encode(JWT_SECRET));
-  console.log('accessToken', accessToken)
 
   // Create refresh token (long-lived)
   const refreshToken = await new jose.SignJWT({
@@ -155,7 +147,6 @@ export async function POST(request: Request) {
     return response;
   }
 
-  console.log(`this  platform would be consideered not web: ${platform}`)
   // For native platforms, return both tokens in the response body
   return Response.json({
     access_token: accessToken,
