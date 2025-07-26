@@ -256,8 +256,8 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
             {monthDays.map((date: Date, idx: number) => {
               const key = date.toISOString().slice(0, 10);
               const cals = caloriesPerDay[key] || 0;
-              // Circle radius: min 10, max 28
-              const minR = 10, maxR = 28;
+              // Circle radius: min 6, max 16
+              const minR = 6, maxR = 16;
               const r = cals === 0 ? minR : minR + ((maxR - minR) * cals) / maxCals;
               return (
                 <View key={key} style={styles.calendarDayCell}>
@@ -299,7 +299,8 @@ const styles = StyleSheet.create({
   chartSection: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -318,7 +319,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
-    gap: 12,
+    gap: 5,
   },
   periodButtonSelected: {
     backgroundColor: '#ED2737',
@@ -372,4 +373,4 @@ const styles = StyleSheet.create({
     color: '#ED2737',
     fontWeight: 'bold',
   },
-}); 
+});

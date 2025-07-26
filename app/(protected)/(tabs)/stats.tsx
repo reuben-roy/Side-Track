@@ -230,6 +230,35 @@ export default function StatsScreen() {
     setGoalProgress({ week: Math.round((weekCals / calorieGoal) * 100), month: Math.round((monthCals / (calorieGoal * 4)) * 100) });
   };
 
+  // Helper function to group workouts by day
+  const groupWorkoutsByDay = (logs: WorkoutLog[]) => {
+    const grouped: { [date: string]: { logs: WorkoutLog[], totalCalories: number } } = {};
+    
+    logs.forEach(log => {
+      const dateKey = new Date(log.date).toDateString();
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = { logs: [], totalCalories: 0 };
+      }
+      grouped[dateKey].logs.push(log);
+      
+      // Calculate calories for this log
+      const exercise = exercises.find(e => e.name === log.exercise);
+      const met = exercise ? exercise.met : 5;
+      const profileStr = profile.weight || '170';
+      const weightMatch = profileStr.match(/(\d+\.?\d*)/);
+      const weightLbs = weightMatch ? parseFloat(weightMatch[1]) : 170;
+      const weightKg = weightLbs * 0.453592;
+      const durationMin = 1 * 2; // 1 set * 2 minutes
+      const cals = (met * weightKg * 3.5 / 200) * durationMin;
+      grouped[dateKey].totalCalories += Math.round(cals);
+    });
+    
+    return grouped;
+  };
+
+  const groupedWorkouts = groupWorkoutsByDay(workoutLogs);
+  const sortedDates = Object.keys(groupedWorkouts).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
   useEffect(() => {
     fetchStats();
   }, []);
@@ -241,8 +270,6 @@ export default function StatsScreen() {
     const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
     return new Date(d.setDate(diff));
   }
-
-
 
   return (
     <ScrollView style={styles.container}>
@@ -303,7 +330,7 @@ export default function StatsScreen() {
           <Text style={styles.totalsValue}>R: {allTimeTotals.reps}</Text>
         </View>
         {/* Personal Bests */}
-        <View style={styles.statsSummaryBox}>
+        {/* <View style={styles.statsSummaryBox}>
           <Text style={styles.bestsLabel}>Personal Bests</Text>
           {Object.keys(personalBests).length === 0 ? (
             <Text style={styles.bestsValue}>No data</Text>
@@ -314,7 +341,7 @@ export default function StatsScreen() {
               </Text>
             ))
           )}
-        </View>
+        </View> */}
       </View>
       
       <View style={styles.historySection}>
@@ -322,37 +349,62 @@ export default function StatsScreen() {
         {workoutLogs.length === 0 ? (
           <Text style={styles.noWorkouts}>No workouts logged yet</Text>
         ) : (
-          workoutLogs.map((log, index) => (
-            <View key={index} style={styles.workoutCard}>
-              <View style={styles.workoutHeader}>
-                <Text style={styles.exerciseName}>{log.exercise}</Text>
-                <View style={styles.headerRight}>
-                  <Text style={styles.workoutDate}>{formatDate(log.date)}</Text>
-                  <TouchableOpacity 
-                    style={styles.optionsButton}
-                    onPress={() => toggleOptions(index)}
-                  >
-                    <Text style={styles.optionsIcon}>⋮</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.setsContainer}>
-                <Text style={styles.setText}>
-                  {log.weight ? `${log.weight} lbs` : '-'} × {log.reps ? `${log.reps} reps` : '-'}
-                </Text>
-              </View>
-              {expandedOptions === index && (
-                <View style={styles.optionsContainer}>
-                  <TouchableOpacity 
-                    style={styles.deleteButtonContainer}
-                    onPress={() => deleteWorkout(index)}
-                  >
-                    <Text style={styles.deleteButton}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+          sortedDates.map((dateKey) => {
+        const dayData = groupedWorkouts[dateKey];
+        const formattedDate = new Date(dateKey).toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
+        
+        return (
+          <View key={dateKey} style={styles.dayGroup}>
+            <View style={styles.dayHeader}>
+              <Text style={styles.dayHeaderText}>{formattedDate}</Text>
+              <Text style={styles.dayCaloriesText}>{dayData.totalCalories} kcal</Text>
             </View>
-          ))
+            <View style={styles.scrollableExercisesContainer}>
+              <ScrollView 
+                style={styles.scrollableExercises} 
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+                bounces={true}
+              >
+                {dayData.logs.map((log, exerciseIndex) => {
+                  const globalIndex = workoutLogs.findIndex(wl => wl === log);
+                  return (
+                    <View key={`${dateKey}-${exerciseIndex}`} style={styles.exerciseCard}>
+                      <View style={styles.exerciseHeader}>
+                        <Text style={styles.exerciseName}>{log.exercise}</Text>
+                        <View style={styles.headerRight}>
+                          <Text style={styles.workoutDate}>{formatDate(log.date)}</Text>
+                          <TouchableOpacity style={styles.optionsButton} onPress={() => toggleOptions(globalIndex)}>
+                            <Text style={styles.optionsIcon}>⋮</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      <Text style={styles.setText}>
+                        {log.weight ? `${log.weight} lbs` : '-'} × {log.reps ? `${log.reps} reps` : '-'}
+                      </Text>
+                      {expandedOptions === globalIndex && (
+                        <View style={styles.optionsContainer}>
+                          <TouchableOpacity 
+                            style={styles.deleteButtonContainer}
+                            onPress={() => deleteWorkout(globalIndex)}
+                          >
+                            <Text style={styles.deleteButton}>Delete</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+        );
+          })
         )}
       </View>
     </ScrollView>
@@ -377,7 +429,6 @@ const styles = StyleSheet.create({
   calories: {
     fontWeight: 'bold',
     color: '#ED2737',
-    // textAlign: 'right',
   },
   historySection: {
     flex: 1,
@@ -547,5 +598,59 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginHorizontal: 8,
     overflow: 'hidden',
+  },
+  dayGroup: {
+    marginBottom: 20,
+  },
+  dayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  dayHeaderText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#181C20',
+  },
+  dayCaloriesText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ED2737',
+  },
+  exerciseCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    marginLeft: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  exerciseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  scrollableExercisesContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  scrollableExercises: {
+    maxHeight: 200,
+    paddingVertical: 8,
   },
 });
