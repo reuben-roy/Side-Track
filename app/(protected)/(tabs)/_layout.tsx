@@ -35,7 +35,7 @@ export default function TabLayout() {
         name="index"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('2%') : 0, paddingVertical: focused ? hp('1%') : 0, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('4%') : wp('3%'), paddingVertical: focused ? hp('1%') : hp('0.5%'), alignItems: 'center', minWidth: wp('20%'), justifyContent: 'center' }}>
               <IconSymbol size={wp('6%')} name="house.fill" color={focused ? '#181C20' : '#fff'} />
               {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: wp('4%'), marginLeft: wp('1%') }}>Home</Text>}
             </View>
@@ -46,7 +46,7 @@ export default function TabLayout() {
         name="stats"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('2%') : 0, paddingVertical: focused ? hp('1%') : 0, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('4%') : wp('3%'), paddingVertical: focused ? hp('1%') : hp('0.5%'), alignItems: 'center', minWidth: wp('20%'), justifyContent: 'center' }}>
               <IconSymbol size={wp('6%')} name="rectangle.3.offgrid.fill" color={focused ? '#181C20' : '#fff'} />
               {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: wp('4%'), marginLeft: wp('1%') }}>Stats</Text>}
             </View>
