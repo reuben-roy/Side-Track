@@ -1,16 +1,7 @@
 import { useAuth } from '@/context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FIELDS, ProfileKeys, useProfile } from '@/context/ProfileContext';
 import React, { useState } from 'react';
-import { Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-const FIELDS = [
-  { key: 'weight', label: 'Weight', default: '170 lb' },
-  { key: 'height', label: 'Height', default: "5'9\"" },
-  { key: 'calorieGoal', label: 'Calorie Goal', default: '2000 Cal' },
-] as const;
-
-type ProfileKeys = typeof FIELDS[number]['key'];
-type Profile = Record<ProfileKeys, string>;
+import { Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // BMI calculation function
 const calculateBMI = (weight: string, height: string): string => {
@@ -45,29 +36,14 @@ interface ProfileButtonProps {
 
 export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonProps) {
   const auth = useAuth();
-  const user = auth?.user;
-  const logout = auth?.logout;
+  const { profile, updateProfile } = useProfile();
+  const { user, logout } = auth || {};
   const [modalVisible, setModalVisible] = useState(false);
-  const [profile, setProfile] = useState<Profile>({ weight: '', height: '', calorieGoal: '' });
   const [editingField, setEditingField] = useState<ProfileKeys | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [heightFeet, setHeightFeet] = useState('');
   const [heightInches, setHeightInches] = useState('');
-
-  React.useEffect(() => {
-    (async () => {
-      const stored = await AsyncStorage.getItem('profile');
-      if (stored) {
-        setProfile(JSON.parse(stored));
-      } else {
-        setProfile({
-          weight: FIELDS[0].default,
-          height: FIELDS[1].default,
-          calorieGoal: FIELDS[2].default,
-        });
-      }
-    })();
-  }, []);
+  const [genderDropdownVisible, setGenderDropdownVisible] = useState(false);
 
   const openEdit = (fieldKey: ProfileKeys) => {
     setEditingField(fieldKey);
@@ -76,24 +52,29 @@ export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonPro
       const match = profile.height.match(/(\d+)'(\d+)?/);
       setHeightFeet(match ? match[1] : '');
       setHeightInches(match && match[2] ? match[2] : '');
+    } else if (fieldKey === 'gender') {
+      setGenderDropdownVisible(true);
     } else {
       setInputValue(profile[fieldKey] || '');
     }
   };
 
+  const selectGender = async (gender: string) => {
+    await updateProfile('gender', gender);
+    setGenderDropdownVisible(false);
+    setEditingField(null);
+  };
+
   const saveEdit = async () => {
     if (!editingField) return;
-    let updated: Profile;
     if (editingField === 'height') {
       const feet = heightFeet.replace(/[^0-9]/g, '');
       const inches = heightInches.replace(/[^0-9]/g, '');
       const formatted = `${feet}'${inches}\"`;
-      updated = { ...profile, height: formatted };
+      await updateProfile('height', formatted);
     } else {
-      updated = { ...profile, [editingField]: inputValue };
+      await updateProfile(editingField, inputValue);
     }
-    setProfile(updated);
-    await AsyncStorage.setItem('profile', JSON.stringify(updated));
     setEditingField(null);
     setInputValue('');
     setHeightFeet('');
@@ -108,8 +89,8 @@ export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonPro
   return (
     <>
       <TouchableOpacity style={[styles.profileButton, { top, right }]} onPress={() => setModalVisible(true)}>
-        {user?.photoUrl ? (
-          <Image source={{ uri: user.photoUrl }} style={styles.profileImage} />
+        {user?.picture ? (
+          <Image source={{ uri: user.picture }} style={styles.profileImage} />
         ) : (
           <View style={styles.profilePlaceholder}>
             <Text style={styles.profilePlaceholderText}>
@@ -134,88 +115,114 @@ export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonPro
               </TouchableOpacity>
             </View>
 
-            {editingField ? (
-              <View style={styles.editSection}>
-                <Text style={styles.editLabel}>
-                  Edit {FIELDS.find(f => f.key === editingField)?.label}
-                </Text>
-                {editingField === 'height' ? (
-                  <View style={styles.heightInputs}>
+            <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+              {editingField ? (
+                <View style={styles.editSection}>
+                  <Text style={styles.editLabel}>
+                    Edit {FIELDS.find(f => f.key === editingField)?.label}
+                  </Text>
+                  {editingField === 'height' ? (
+                    <View style={styles.heightInputs}>
+                      <TextInput
+                        style={[styles.input, { width: 60 }]}
+                        value={heightFeet}
+                        onChangeText={setHeightFeet}
+                        keyboardType="numeric"
+                        placeholder="ft"
+                        maxLength={2}
+                        autoFocus
+                      />
+                      <Text style={styles.inputLabel}>ft</Text>
+                      <TextInput
+                        style={[styles.input, { width: 60 }]}
+                        value={heightInches}
+                        onChangeText={setHeightInches}
+                        keyboardType="numeric"
+                        placeholder="in"
+                        maxLength={2}
+                      />
+                      <Text style={styles.inputLabel}>inch</Text>
+                    </View>
+                  ) : editingField === 'gender' && genderDropdownVisible ? (
+                    <View style={styles.genderOptions}>
+                      {['Male', 'Female', 'Other'].map((option) => (
+                        <TouchableOpacity
+                          key={option}
+                          style={[
+                            styles.genderOption,
+                            profile.gender === option && styles.selectedGenderOption
+                          ]}
+                          onPress={() => selectGender(option)}
+                        >
+                          <Text style={[
+                            styles.genderOptionText,
+                            profile.gender === option && styles.selectedGenderOptionText
+                          ]}>
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : (
                     <TextInput
-                      style={[styles.input, { width: 60 }]}
-                      value={heightFeet}
-                      onChangeText={setHeightFeet}
-                      keyboardType="numeric"
-                      placeholder="ft"
-                      maxLength={2}
+                      style={styles.input}
+                      value={inputValue}
+                      onChangeText={setInputValue}
                       autoFocus
                     />
-                    <Text style={styles.inputLabel}>ft</Text>
-                    <TextInput
-                      style={[styles.input, { width: 60 }]}
-                      value={heightInches}
-                      onChangeText={setHeightInches}
-                      keyboardType="numeric"
-                      placeholder="in"
-                      maxLength={2}
-                    />
-                    <Text style={styles.inputLabel}>inch</Text>
-                  </View>
-                ) : (
-                  <TextInput
-                    style={styles.input}
-                    value={inputValue}
-                    onChangeText={setInputValue}
-                    autoFocus
-                  />
-                )}
-                <View style={styles.editButtons}>
-                  <TouchableOpacity style={styles.cancelButton} onPress={() => setEditingField(null)}>
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.saveButton} onPress={saveEdit}>
-                    <Text style={styles.saveButtonText}>Save</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.profileSection}>
-                <View style={styles.profileRow}>
-                  <TouchableOpacity style={styles.profileCard} onPress={() => openEdit('weight')}>
-                    <Text style={styles.profileLabel}>Weight</Text>
-                    <View style={styles.profileValueRow}>
-                      <Text style={styles.profileValue}>{profile.weight}</Text>
-                      <Text style={styles.profileUnit}>lb</Text>
-                    </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.profileCard} onPress={() => openEdit('height')}>
-                    <Text style={styles.profileLabel}>Height</Text>
-                    <Text style={styles.profileValue}>{profile.height}</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.profileRow}>
-                  <TouchableOpacity style={styles.profileCard} onPress={() => openEdit('calorieGoal')}>
-                    <Text style={styles.profileLabel}>Calorie Goal</Text>
-                    <View style={styles.profileValueRow}>
-                      <Text style={styles.profileValue}>{profile.calorieGoal}</Text>
-                      <Text style={styles.profileUnit}>Cal</Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.profileRow}>
-                  <View style={styles.profileCard}>
-                    <Text style={styles.profileLabel}>BMI</Text>
-                    <View style={styles.profileValueRow}>
-                      <Text style={styles.profileValue}>{calculateBMI(profile.weight, profile.height)}</Text>
-                      <Text style={styles.profileUnit}>kg/m²</Text>
-                    </View>
+                  )}
+                  <View style={styles.editButtons}>
+                    <TouchableOpacity style={styles.cancelButton} onPress={() => setEditingField(null)}>
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.saveButton} onPress={saveEdit}>
+                      <Text style={styles.saveButtonText}>Save</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                  <Text style={styles.logoutButtonText}>Logout</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              ) : (
+                <View style={styles.profileSection}>
+                  <View style={styles.profileRow}>
+                    <TouchableOpacity style={styles.profileCard} onPress={() => openEdit('weight')}>
+                      <Text style={styles.profileLabel}>Weight</Text>
+                      <View style={styles.profileValueRow}>
+                        <Text style={styles.profileValue}>{profile.weight}</Text>
+                        <Text style={styles.profileUnit}>lb</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.profileCard} onPress={() => openEdit('height')}>
+                      <Text style={styles.profileLabel}>Height</Text>
+                      <Text style={styles.profileValue}>{profile.height}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.profileRow}>
+                    <TouchableOpacity style={styles.profileCard} onPress={() => openEdit('calorieGoal')}>
+                      <Text style={styles.profileLabel}>Daily Calorie Goal</Text>
+                      <View style={styles.profileValueRow}>
+                        <Text style={styles.profileValue}>{profile.calorieGoal}</Text>
+                        <Text style={styles.profileUnit}>Cal</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.profileCard} onPress={() => openEdit('gender')}>
+                      <Text style={styles.profileLabel}>Gender</Text>
+                      <Text style={styles.profileValue}>{profile.gender}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.profileRow}>
+                    <View style={styles.profileCard}>
+                      <Text style={styles.profileLabel}>BMI</Text>
+                      <View style={styles.profileValueRow}>
+                        <Text style={styles.profileValue}>{calculateBMI(profile.weight, profile.height)}</Text>
+                        <Text style={styles.profileUnit}>kg/m²</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                    <Text style={styles.logoutButtonText}>Logout</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -258,7 +265,7 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '90%',
     maxWidth: 400,
-    maxHeight: '80%',
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -276,21 +283,25 @@ const styles = StyleSheet.create({
     color: '#888',
     fontWeight: 'bold',
   },
+  scrollContainer: {
+    flexGrow: 1,
+  },
   profileSection: {
-    flex: 1,
+    paddingBottom: 16,
   },
   profileRow: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   profileCard: {
     flex: 1,
     backgroundColor: '#FCFEFA',
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     marginRight: 12,
     borderWidth: 1,
     borderColor: '#ECECEC',
+    minHeight: 80,
   },
   profileLabel: {
     color: '#A0A0A0',
@@ -325,7 +336,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   editSection: {
-    flex: 1,
+    paddingBottom: 20,
   },
   editLabel: {
     fontSize: 18,
@@ -336,7 +347,7 @@ const styles = StyleSheet.create({
   heightInputs: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
     gap: 8,
   },
   input: {
@@ -356,6 +367,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+    marginTop: 8,
   },
   cancelButton: {
     flex: 1,
@@ -382,4 +394,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-}); 
+  genderOptions: {
+    marginBottom: 24,
+  },
+  genderOption: {
+    borderWidth: 1,
+    borderColor: '#ECECEC',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  selectedGenderOption: {
+    backgroundColor: '#B6F533',
+    borderColor: '#B6F533',
+  },
+  genderOptionText: {
+    fontSize: 16,
+    color: '#181C20',
+    textAlign: 'center',
+  },
+  selectedGenderOptionText: {
+    fontWeight: '600',
+  },
+});

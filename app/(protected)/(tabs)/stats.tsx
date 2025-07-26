@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import CaloriesChart from '../../../components/CaloriesChart';
 import MuscleCapacitySection from '../../../components/MuscleCapacitySection';
@@ -259,9 +260,12 @@ export default function StatsScreen() {
   const groupedWorkouts = groupWorkoutsByDay(workoutLogs);
   const sortedDates = Object.keys(groupedWorkouts).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
+  // Add focus effect to refresh data when tab becomes active
+  useFocusEffect(
+    useCallback(() => {
+      fetchStats();
+    }, [])
+  );
 
   // Helper function for getting start of week
   function getStartOfWeekForGoal(date: Date) {
