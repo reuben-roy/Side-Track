@@ -1,4 +1,4 @@
-import { BASE_URL, GOOGLE_CLIENT_SECRET, TOKEN_KEY_NAME } from '@/constants/GlobalConstants';
+import { BASE_URL, GOOGLE_CLIENT_SECRET } from '@/constants/GlobalConstants';
 import { tokenCache } from '@/helper/cache';
 import { AuthError, AuthRequestConfig, DiscoveryDocument, exchangeCodeAsync, makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 import { router } from 'expo-router';
@@ -196,8 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const sessionData = await sessionResponse.json();
             setUser(sessionData as AuthUser);
           }
-          
-          router.replace('/(protected)/(tabs)');
+          // Removed router.replace from here
         } else {
           // For native platforms, use the standard expo-auth-session flow
           const newAccessToken = tokenResponse.accessToken;
@@ -238,6 +237,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Add a useEffect to handle web redirect after user is set
+  React.useEffect(() => {
+    if (isWeb && user) {
+      router.replace('/(protected)/(tabs)');
+    }
+  }, [isWeb, user]);
+
     const loginWithGoogle = async () => {
       console.log("signIn");
       try {
@@ -261,30 +267,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const loginWithApple = async () => { };
 
     const logout = async () => {
-      setLoading(true);
-      tokenCache?.deleteToken(TOKEN_KEY_NAME);
+      if (isWeb) {
+        // For web: Call logout endpoint to clear the cookie
+        try {
+          await fetch(`${BASE_URL}/api/auth/logout`, {
+            method: "POST",
+            credentials: "include",
+          });
+        } catch (error) {
+          console.error("Error during web logout:", error);
+        }
+      } else {
+        // For native: Clear both tokens from cache
+        await tokenCache?.deleteToken("accessToken");
+        await tokenCache?.deleteToken("refreshToken");
+      }
+  
+      // Clear state
       setUser(null);
+      setAccessToken(null);
+      setRefreshToken(null);
+
+      //////
       router.replace('/login');
-      setLoading(false);
     };
 
-    const fetchWithAuth = async (input: RequestInfo, init: RequestInit = {}) => {
-      let token = user?.accessToken;
-      if (!token && user) {
-        const userData = await tokenCache?.getToken(TOKEN_KEY_NAME)
-        if (userData) {
-          const storedUser = JSON.parse(userData);
-          token = storedUser.accessToken;
+    const fetchWithAuth = async (url: string, options: RequestInit) => {
+      if (isWeb) {
+        // For web: Include credentials to send cookies
+        const response = await fetch(url, {
+          ...options,
+          credentials: "include",
+        });
+  
+        // If the response indicates an authentication error, try to refresh the token
+        if (response.status === 401) {
+          console.log("API request failed with 401, attempting to refresh token");
+  
+          // // Try to refresh the token
+          // await refreshAccessToken();
+  
+          // If we still have a user after refresh, retry the request
+          if (user) {
+            return fetch(url, {
+              ...options,
+              credentials: "include",
+            });
+          }
         }
+  
+        return response;
+      } else {
+        // For native: Use token in Authorization header
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            ...options.headers,
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+  
+        // If the response indicates an authentication error, try to refresh the token
+        if (response.status === 401) {
+          console.log("API request failed with 401, attempting to refresh token");
+  
+          // // Try to refresh the token and get the new token directly
+          // const newToken = await refreshAccessToken();
+  
+          // If we got a new token, retry the request with it
+          // if (newToken) {
+          //   return fetch(url, {
+          //     ...options,
+          //     headers: {
+          //       ...options.headers,
+          //       Authorization: `Bearer ${newToken}`,
+          //     },
+          //   });
+          // }
+        }
+  
+        return response;
       }
-      if (!token) {
-        throw new Error('No access token available');
-      }
-      const headers = {
-        ...(init.headers || {}),
-        Authorization: `Bearer ${token}`,
-      };
-      return fetch(input, { ...init, headers });
     };
 
     return (

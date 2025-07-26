@@ -1,8 +1,7 @@
-import HumanMuscleMap from '@/components/HumanMuscleMap';
 import SlotPicker from '@/components/SlotPicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { exercises } from '../../../constants/Exercises';
 import { muscleGroups } from '../../../constants/MuscleGroups';
 import { calculateCapacityDrain } from '../../../helper/utils';
@@ -12,6 +11,12 @@ interface WorkoutScreenProps {
   weight: string;
   reps: string;
   onClose: () => void;
+}
+
+interface CompletedSet {
+  weight: number;
+  reps: number;
+  timestamp: string;
 }
 
 export default function WorkoutScreen({ exercise, weight, reps, onClose }: WorkoutScreenProps) {
@@ -28,25 +33,37 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
   const [repsIdx, setRepsIdx] = useState(initialRepsIdx >= 0 ? initialRepsIdx : 0);
   const [logging, setLogging] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [completedSets, setCompletedSets] = useState<CompletedSet[]>([]);
 
   const logExercise = async () => {
     setLogging(true);
+    const currentWeight = parseInt(weights[weightIdx].split(" ")[0], 10);
+    const currentReps = parseInt(repsList[repsIdx].split(" ")[0]);
+
+    // Add to completed sets first
+    const newSet: CompletedSet = {
+      weight: currentWeight,
+      reps: currentReps,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setCompletedSets(prev => [...prev, newSet]);
+
     const workout = {
       exercise,
-      weight: parseInt(weights[weightIdx].split(" ")[0], 10),
-      reps: parseInt(repsList[repsIdx].split(" ")[0]),
+      weight: currentWeight,
+      reps: currentReps,
       date: new Date().toISOString(),
     };
+
     try {
       const prev = await AsyncStorage.getItem('workoutLogs');
       const logs = prev ? JSON.parse(prev) : [];
-      console.log("workout logs", logs);
       logs.push(workout);
       await AsyncStorage.setItem('workoutLogs', JSON.stringify(logs));
 
       // --- Decrease muscle capacity after logging workout ---
       const prevCapacityStr = await AsyncStorage.getItem('muscleCapacity');
-      let prevCapacity: Record<string, number> = prevCapacityStr ? JSON.parse(prevCapacityStr) : { ...require('../../constants/Exercises').maxMuscleCapacity };
+      let prevCapacity: Record<string, number> = prevCapacityStr ? JSON.parse(prevCapacityStr) : { ...require('../../../constants/Exercises').maxMuscleCapacity };
       // Parse reps as number (e.g., '10 reps' -> 10)
       const repsNum = parseInt(repsList[repsIdx]);
       // Parse weight as number (e.g., '135 lbs' -> 135, or 'Bodyweight' remains string)
@@ -63,7 +80,7 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       setLogging(false);
       setShowToast(true);
       setTimeout(() => setShowToast(false), 2000);
-      setTimeout(onClose, 1200);
+      
     } catch (e) {
       setLogging(false);
       alert('Failed to log workout');
@@ -77,35 +94,54 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       </TouchableOpacity>
       <Text style={styles.header}>Log Workout</Text>
       <Text style={styles.exerciseName}>{exercise}</Text>
-      <HumanMuscleMap />
+
+      {completedSets.length > 0 && (
+        <View style={styles.setsContainer}>
+          <Text style={styles.setsTitle}>Completed Sets</Text>
+            <ScrollView 
+            style={[styles.setsList, { height: 150 }]} 
+            showsVerticalScrollIndicator={false}
+            >
+            {completedSets.map((set, index) => (
+              <View key={index} style={styles.setItem}>
+              <Text style={styles.setNumber}>Set {index + 1}</Text>
+              <Text style={styles.setDetails}>
+                {set.weight} lbs × {set.reps} reps
+              </Text>
+              <Text style={styles.setTime}>{set.timestamp}</Text>
+              </View>
+            ))}
+            </ScrollView>
+        </View>
+      )}
+
       {showToast && (
         <View style={styles.toast}>
-          <Text style={styles.toastText}>Workout logged!</Text>
+          <Text style={styles.toastText}>Set logged!</Text>
         </View>
       )}
       <View style={styles.flexBottomContainer}>
-          {/* <Text style={styles.sectionTitle}>Exercise</Text> */}
-          <View style={styles.inlinePickersRow}>
-            <View style={styles.inlinePickerCol}>
-              <Text style={styles.sectionTitle}>Weight</Text>
-              <SlotPicker
-                data={weights}
-                selectedIndex={weightIdx}
-                onSelect={setWeightIdx}
-                style={{}}
-              />
-            </View>
-            <View style={styles.inlinePickerCol}>
-              <Text style={styles.sectionTitle}>Reps</Text>
-              <SlotPicker
-                data={repsList}
-                selectedIndex={repsIdx}
-                onSelect={setRepsIdx}
-              />
-            </View>
+        <View style={styles.inlinePickersRow}>
+          <View style={styles.inlinePickerCol}>
+            <Text style={styles.sectionTitle}>Weight</Text>
+            <SlotPicker
+              data={weights}
+              selectedIndex={weightIdx}
+              onSelect={setWeightIdx}
+              style={{}}
+            />
           </View>
+          <View style={styles.inlinePickerCol}>
+            <Text style={styles.sectionTitle}>Reps</Text>
+            <SlotPicker
+              data={repsList}
+              selectedIndex={repsIdx}
+              onSelect={setRepsIdx}
+            />
+          </View>
+        </View>
         <TouchableOpacity style={styles.logButton} onPress={logExercise} disabled={logging}>
-          <Text style={styles.logButtonText}>{logging ? 'Logging...' : 'Log Exercise'}</Text>
+          <Text style={styles.logButtonText}>{logging ? 'Logging...' : 'Log Set'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -193,4 +229,49 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-}); 
+  setsContainer: {
+    marginTop: 20,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 16,
+    padding: 16,
+    maxHeight: 200,
+  },
+  setsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#181C20',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  setsList: {
+    flexGrow: 1,
+  },
+  setItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  setNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#181C20',
+    flex: 1,
+  },
+  setDetails: {
+    fontSize: 16,
+    color: '#181C20',
+    flex: 2,
+    textAlign: 'center',
+  },
+  setTime: {
+    fontSize: 14,
+    color: '#C2BABA',
+    flex: 1,
+    textAlign: 'right',
+  },
+});
