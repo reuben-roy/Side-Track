@@ -1,4 +1,5 @@
 import SlotPicker from '@/components/SlotPicker';
+import { useProfile } from '@/context/ProfileContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -20,6 +21,8 @@ interface CompletedSet {
 }
 
 export default function WorkoutScreen({ exercise, weight, reps, onClose }: WorkoutScreenProps) {
+  const { profile } = useProfile();
+  
   // Find the exercise object
   const exerciseObj = exercises.find(e => e.name === exercise);
   const weights = exerciseObj ? exerciseObj.weights.map(w => typeof w === 'number' ? `${w} lbs` : w) : [];
@@ -40,9 +43,24 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
     const currentWeight = parseInt(weights[weightIdx].split(" ")[0], 10);
     const currentReps = parseInt(repsList[repsIdx].split(" ")[0]);
 
+    let actualWeight: number;
+    const selectedWeight = weights[weightIdx];
+    const profileWeight = parseInt(profile?.weight || '0', 10);
+    
+    if (selectedWeight === 'Bodyweight') {
+      actualWeight = profileWeight;
+    } else if (selectedWeight.startsWith('+')) {
+      // Handle +10, +20, +30 etc as bodyweight + additional weight
+      const additionalWeight = parseInt(selectedWeight.substring(1));
+      actualWeight = profileWeight + additionalWeight;
+    } else {
+      // Regular weight (e.g., "135 lbs")
+      actualWeight = currentWeight;
+    }
+    
     // Add to completed sets first
     const newSet: CompletedSet = {
-      weight: currentWeight,
+      weight: actualWeight,
       reps: currentReps,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
@@ -50,7 +68,7 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
 
     const workout = {
       exercise,
-      weight: currentWeight,
+      weight: actualWeight,
       reps: currentReps,
       date: new Date().toISOString(),
     };
