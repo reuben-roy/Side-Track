@@ -4,7 +4,7 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 export const FIELDS = [
   { key: 'weight', label: 'Weight', default: '170' },
   { key: 'height', label: 'Height', default: "5'9\"" },
-  { key: 'calorieGoal', label: 'Calorie Goal', default: '2000' },
+  { key: 'calorieGoal', label: 'Calorie Goal', default: '360' },
   { key: 'gender', label: 'Gender', default: 'Male' },
 ] as const;
 

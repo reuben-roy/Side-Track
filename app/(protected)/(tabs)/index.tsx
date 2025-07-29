@@ -49,7 +49,8 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ProfileButton top={50} right={20} />
-      <Text style={styles.header}>Workout</Text>
+      <Text style={styles.header}>SideTrack</Text>
+      <Text style={styles.subHeader}>Work Out till you Pass Out</Text>
       <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
       <View style={styles.slotRow}>
         <View style={styles.slotCol}>
@@ -196,6 +197,13 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginTop: 25,
+    marginBottom: 5,
+    color: '#181C20',
+    left: 20,
+  },
+  subHeader: {
+    fontSize: 12,
+    fontWeight: 'bold',
     marginBottom: 24,
     color: '#181C20',
     left: 20,

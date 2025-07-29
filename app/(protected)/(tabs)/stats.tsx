@@ -112,7 +112,7 @@ export default function StatsScreen() {
     // Get user weight and calorie goal
     const profileStr = await AsyncStorage.getItem('profile');
     let weightLbs = 170;
-    let calorieGoal = 2000;
+    let calorieGoal = 360;
     if (profileStr) {
       const profileObj = JSON.parse(profileStr);
       // Parse weight from string format

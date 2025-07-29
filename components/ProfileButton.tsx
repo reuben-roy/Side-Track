@@ -1,7 +1,8 @@
 import { useAuth } from '@/context/AuthContext';
 import { FIELDS, ProfileKeys, useProfile } from '@/context/ProfileContext';
 import React, { useState } from 'react';
-import { Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ProfileInputField, { InputType } from './ProfileInputField';
 
 // BMI calculation function
 const calculateBMI = (weight: string, height: string): string => {
@@ -40,45 +41,30 @@ export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonPro
   const { user, logout } = auth || {};
   const [modalVisible, setModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<ProfileKeys | null>(null);
-  const [inputValue, setInputValue] = useState('');
-  const [heightFeet, setHeightFeet] = useState('');
-  const [heightInches, setHeightInches] = useState('');
-  const [genderDropdownVisible, setGenderDropdownVisible] = useState(false);
+
+  const getInputType = (fieldKey: ProfileKeys): InputType => {
+    switch (fieldKey) {
+      case 'height':
+        return 'height';
+      case 'gender':
+        return 'gender';
+      default:
+        return 'text';
+    }
+  };
 
   const openEdit = (fieldKey: ProfileKeys) => {
     setEditingField(fieldKey);
-    if (fieldKey === 'height') {
-      // Parse height like 5'9"
-      const match = profile.height.match(/(\d+)'(\d+)?/);
-      setHeightFeet(match ? match[1] : '');
-      setHeightInches(match && match[2] ? match[2] : '');
-    } else if (fieldKey === 'gender') {
-      setGenderDropdownVisible(true);
-    } else {
-      setInputValue(profile[fieldKey] || '');
-    }
   };
 
-  const selectGender = async (gender: string) => {
-    await updateProfile('gender', gender);
-    setGenderDropdownVisible(false);
-    setEditingField(null);
-  };
-
-  const saveEdit = async () => {
+  const handleSave = async (value: string) => {
     if (!editingField) return;
-    if (editingField === 'height') {
-      const feet = heightFeet.replace(/[^0-9]/g, '');
-      const inches = heightInches.replace(/[^0-9]/g, '');
-      const formatted = `${feet}'${inches}\"`;
-      await updateProfile('height', formatted);
-    } else {
-      await updateProfile(editingField, inputValue);
-    }
+    await updateProfile(editingField, value);
     setEditingField(null);
-    setInputValue('');
-    setHeightFeet('');
-    setHeightInches('');
+  };
+
+  const handleCancel = () => {
+    setEditingField(null);
   };
 
   const handleLogout = () => {
@@ -117,69 +103,13 @@ export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonPro
 
             <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
               {editingField ? (
-                <View style={styles.editSection}>
-                  <Text style={styles.editLabel}>
-                    Edit {FIELDS.find(f => f.key === editingField)?.label}
-                  </Text>
-                  {editingField === 'height' ? (
-                    <View style={styles.heightInputs}>
-                      <TextInput
-                        style={[styles.input, { width: 60 }]}
-                        value={heightFeet}
-                        onChangeText={setHeightFeet}
-                        keyboardType="numeric"
-                        placeholder="ft"
-                        maxLength={2}
-                        autoFocus
-                      />
-                      <Text style={styles.inputLabel}>ft</Text>
-                      <TextInput
-                        style={[styles.input, { width: 60 }]}
-                        value={heightInches}
-                        onChangeText={setHeightInches}
-                        keyboardType="numeric"
-                        placeholder="in"
-                        maxLength={2}
-                      />
-                      <Text style={styles.inputLabel}>inch</Text>
-                    </View>
-                  ) : editingField === 'gender' && genderDropdownVisible ? (
-                    <View style={styles.genderOptions}>
-                      {['Male', 'Female', 'Other'].map((option) => (
-                        <TouchableOpacity
-                          key={option}
-                          style={[
-                            styles.genderOption,
-                            profile.gender === option && styles.selectedGenderOption
-                          ]}
-                          onPress={() => selectGender(option)}
-                        >
-                          <Text style={[
-                            styles.genderOptionText,
-                            profile.gender === option && styles.selectedGenderOptionText
-                          ]}>
-                            {option}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  ) : (
-                    <TextInput
-                      style={styles.input}
-                      value={inputValue}
-                      onChangeText={setInputValue}
-                      autoFocus
-                    />
-                  )}
-                  <View style={styles.editButtons}>
-                    <TouchableOpacity style={styles.cancelButton} onPress={() => setEditingField(null)}>
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.saveButton} onPress={saveEdit}>
-                      <Text style={styles.saveButtonText}>Save</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <ProfileInputField
+                  label={FIELDS.find(f => f.key === editingField)?.label || ''}
+                  value={profile[editingField] || ''}
+                  inputType={getInputType(editingField)}
+                  onSave={handleSave}
+                  onCancel={handleCancel}
+                />
               ) : (
                 <View style={styles.profileSection}>
                   <View style={styles.profileRow}>
@@ -333,88 +263,6 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  editSection: {
-    paddingBottom: 20,
-  },
-  editLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#181C20',
-  },
-  heightInputs: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-    gap: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ECECEC',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#181C20',
-    backgroundColor: '#fff',
-  },
-  inputLabel: {
-    fontSize: 16,
-    color: '#888',
-  },
-  editButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 8,
-  },
-  cancelButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ECECEC',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#888',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: '#B6F533',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    color: '#181C20',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  genderOptions: {
-    marginBottom: 24,
-  },
-  genderOption: {
-    borderWidth: 1,
-    borderColor: '#ECECEC',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    backgroundColor: '#fff',
-  },
-  selectedGenderOption: {
-    backgroundColor: '#B6F533',
-    borderColor: '#B6F533',
-  },
-  genderOptionText: {
-    fontSize: 16,
-    color: '#181C20',
-    textAlign: 'center',
-  },
-  selectedGenderOptionText: {
     fontWeight: '600',
   },
 });
