@@ -53,8 +53,11 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       // Handle +10, +20, +30 etc as bodyweight + additional weight
       const additionalWeight = parseInt(selectedWeight.substring(1));
       actualWeight = profileWeight + additionalWeight;
+    } else if (selectedWeight.startsWith('-')) {
+      // Handle -10, -20, -30 etc as bodyweight - additional weight
+      const additionalWeight = parseInt(selectedWeight.substring(1));
+      actualWeight = profileWeight - additionalWeight;
     } else {
-      // Regular weight (e.g., "135 lbs")
       actualWeight = currentWeight;
     }
     

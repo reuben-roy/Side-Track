@@ -9,7 +9,7 @@ import {
   JWT_SECRET,
   REFRESH_COOKIE_NAME,
   REFRESH_COOKIE_OPTIONS,
-  REFRESH_TOKEN_EXPIRY,
+  REFRESH_TOKEN_EXPIRY
 } from "@/constants/GlobalConstants";
 import * as jose from "jose";
 
@@ -79,11 +79,14 @@ export async function POST(request: Request) {
 
   // Create access token (short-lived)
   const accessToken = await new jose.SignJWT(userInfoWithoutExp)
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime(JWT_EXPIRATION_TIME)
-    .setSubject(sub)
-    .setIssuedAt(issuedAt)
-    .sign(new TextEncoder().encode(JWT_SECRET));
+  .setProtectedHeader({ alg: "HS256" })
+  .setExpirationTime(JWT_EXPIRATION_TIME)
+  .setSubject(sub)
+  .setIssuedAt(issuedAt)
+  .sign(new TextEncoder().encode(JWT_SECRET));
+  
+  // console.log("output time ", accessToken["accessToken"].expiresIn)
+  console.log('\naccessToken', accessToken);
 
   // Create refresh token (long-lived)
   const refreshToken = await new jose.SignJWT({
@@ -152,5 +155,6 @@ export async function POST(request: Request) {
     access_token: accessToken,
     refresh_token: refreshToken,
     token_type: "Bearer",
+    expiresIn: "60 minutes",
   });
 }

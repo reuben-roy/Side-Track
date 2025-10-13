@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "fun.explosion.sidetrack",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -45,7 +46,10 @@
           "experimentalLauncherActivity": true
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-apple-authentication"
+      ]
     ],
     "experiments": {
       "typedRoutes": true

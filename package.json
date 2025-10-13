@@ -38,6 +38,7 @@
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",
     "expo-system-ui": "^5.0.10",
+    "expo-updates": "^29.0.10",
     "expo-web-browser": "~14.2.0",
     "jose": "^6.0.12",
     "pod-install": "^0.3.9",

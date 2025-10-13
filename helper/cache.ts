@@ -11,11 +11,8 @@ const createTokenCache = (): {
   deleteToken: (key: string) => Promise<void>;
 } => {
   return {
-    /**
-     * Gets a token from the cache
-     * @param key - The key to get the token from
-     * @returns the token or null if it doesn't exist
-     */
+    //  @param key - The key to get the token from
+    //  @returns the token or null if it doesn't exist
     getToken: async (key: string) => {
       try {
         const item = await SecureStore.getItemAsync(key);
@@ -31,18 +28,14 @@ const createTokenCache = (): {
         return null;
       }
     },
-    /**
-     * Saves a token to the cache
-     * @param key - The key to save the token to
-     * @param token - The token to save
-     */
+
+    //  @param key - The key to save the token to
+    //  @param token - The token to save
     saveToken: (key: string, token: string) => {
       return SecureStore.setItemAsync(key, token);
     },
-    /**
-     * Deletes a token from the cache
-     * @param key - The key to delete the token from
-     */
+    
+    // @param key - The key to delete the token from
     deleteToken: (key: string) => {
       return SecureStore.deleteItemAsync(key);
     },

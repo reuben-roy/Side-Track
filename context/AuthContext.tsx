@@ -97,6 +97,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const storedAccessToken = await tokenCache?.getToken("accessToken");
           const storedRefreshToken = await tokenCache?.getToken("refreshToken");
 
+          console.log('stored token', storedAccessToken);
+
           console.log(
             "Restoring session - Access token:",
             storedAccessToken ? "exists" : "missing"
@@ -130,6 +132,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               //   setRefreshToken(storedRefreshToken);
               //   await refreshAccessToken(storedRefreshToken);
               // }
+              else {
+                await tokenCache?.deleteToken("accessToken");
+                await tokenCache?.deleteToken("refreshToken");
+              }
             } catch (e) {
               console.error("Error decoding stored token:", e);
 
@@ -180,6 +186,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
           discovery
         );
+
+        console.log('token response', tokenResponse)
 
 
         if (isWeb) {
@@ -244,117 +252,118 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isWeb, user]);
 
-    const loginWithGoogle = async () => {
-      console.log("signIn");
-      try {
-        if (!request) {
-          console.log("No request");
-          return;
-        }
-
-        // Use specific options for web to handle COOP issues
-        if (isWeb) {
-          await promptAsync({ windowFeatures: { popup: true } });
-        } else {
-          await promptAsync();
-        }
-      } catch (e) {
-        console.error("Login error:", e);
-        alert(`Login failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+  const loginWithGoogle = async () => {
+    console.log("signIn");
+    try {
+      if (!request) {
+        console.log("No request");
+        return;
       }
-    };
 
-    const loginWithApple = async () => { };
-
-    const logout = async () => {
+      // Use specific options for web to handle COOP issues
       if (isWeb) {
-        // For web: Call logout endpoint to clear the cookie
-        try {
-          await fetch(`${BASE_URL}/api/auth/logout`, {
-            method: "POST",
-            credentials: "include",
-          });
-        } catch (error) {
-          console.error("Error during web logout:", error);
-        }
+        await promptAsync({ windowFeatures: { popup: true } });
       } else {
-        // For native: Clear both tokens from cache
-        await tokenCache?.deleteToken("accessToken");
-        await tokenCache?.deleteToken("refreshToken");
+        await promptAsync();
       }
-  
-      // Clear state
-      setUser(null);
-      setAccessToken(null);
-      setRefreshToken(null);
+    } catch (e) {
+      console.error("Login error:", e);
+      alert(`Login failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
 
-      //////
-      router.replace('/login');
-    };
+  const loginWithApple = async () => { };
 
-    const fetchWithAuth = async (url: string, options: RequestInit) => {
-      if (isWeb) {
-        // For web: Include credentials to send cookies
-        const response = await fetch(url, {
-          ...options,
+  const logout = async () => {
+    if (isWeb) {
+      // For web: Call logout endpoint to clear the cookie
+      try {
+        await fetch(`${BASE_URL}/api/auth/logout`, {
+          method: "POST",
           credentials: "include",
         });
-  
-        // If the response indicates an authentication error, try to refresh the token
-        if (response.status === 401) {
-          console.log("API request failed with 401, attempting to refresh token");
-  
-          // // Try to refresh the token
-          // await refreshAccessToken();
-  
-          // If we still have a user after refresh, retry the request
-          if (user) {
-            return fetch(url, {
-              ...options,
-              credentials: "include",
-            });
-          }
-        }
-  
-        return response;
-      } else {
-        // For native: Use token in Authorization header
-        const response = await fetch(url, {
-          ...options,
-          headers: {
-            ...options.headers,
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-  
-        // If the response indicates an authentication error, try to refresh the token
-        if (response.status === 401) {
-          console.log("API request failed with 401, attempting to refresh token");
-  
-          // // Try to refresh the token and get the new token directly
-          // const newToken = await refreshAccessToken();
-  
-          // If we got a new token, retry the request with it
-          // if (newToken) {
-          //   return fetch(url, {
-          //     ...options,
-          //     headers: {
-          //       ...options.headers,
-          //       Authorization: `Bearer ${newToken}`,
-          //     },
-          //   });
-          // }
-        }
-  
-        return response;
+      } catch (error) {
+        console.error("Error during web logout:", error);
       }
-    };
+    } else {
+      // For native: Clear both tokens from cache
+      await tokenCache?.deleteToken("accessToken");
+      await tokenCache?.deleteToken("refreshToken");
+      console.log("token cache cleared");
+    }
 
-    return (
-      <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginWithApple, logout, fetchWithAuth, error: null }}>
-        {children}
-      </AuthContext.Provider>
-    );
+    // Clear state
+    setUser(null);
+    setAccessToken(null);
+    setRefreshToken(null);
+
+    //////
+    router.replace('/login');
+  };
+
+  const fetchWithAuth = async (url: string, options?: RequestInit) => {
+    if (isWeb) {
+      // For web: Include credentials to send cookies
+      const response = await fetch(url, {
+        ...(options || {}),
+        credentials: "include",
+      });
+
+      // If the response indicates an authentication error, try to refresh the token
+      if (response.status === 401) {
+        console.log("API request failed with 401, attempting to refresh token");
+
+        // // Try to refresh the token
+        // await refreshAccessToken();
+
+        // If we still have a user after refresh, retry the request
+        if (user) {
+          return fetch(url, {
+            ...(options || {}),
+            credentials: "include",
+          });
+        }
+      }
+
+      return response;
+    } else {
+      // For native: Use token in Authorization header
+      const response = await fetch(url, {
+        ...(options || {}),
+        headers: {
+          ...(options?.headers || {}),
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      // If the response indicates an authentication error, try to refresh the token
+      if (response.status === 401) {
+        console.log("API request failed with 401, attempting to refresh token");
+
+        // // Try to refresh the token and get the new token directly
+        // const newToken = await refreshAccessToken();
+
+        // If we got a new token, retry the request with it
+        // if (newToken) {
+        //   return fetch(url, {
+        //     ...(options || {}),
+        //     headers: {
+        //       ...(options?.headers || {}),
+        //       Authorization: `Bearer ${newToken}`,
+        //     },
+        //   });
+        // }
+      }
+
+      return response;
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginWithApple, logout, fetchWithAuth, error: null }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => {
