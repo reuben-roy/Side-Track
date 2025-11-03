@@ -24,7 +24,7 @@ export const GOOGLE_REDIRECT_URI = `${process.env.EXPO_PUBLIC_BASE_URL}/api/auth
 export const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
 // Apple OAuth Constants
-export const APPLE_CLIENT_ID = "com.beto.expoauthexample.web";
+export const APPLE_CLIENT_ID = "fun.explosion.sidetrack.web";
 export const APPLE_CLIENT_SECRET = process.env.APPLE_CLIENT_SECRET!;
 export const APPLE_REDIRECT_URI = `${process.env.EXPO_PUBLIC_BASE_URL}/api/auth/apple/callback`;
 export const APPLE_AUTH_URL = "https://appleid.apple.com/auth/authorize";

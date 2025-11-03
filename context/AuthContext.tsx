@@ -1,6 +1,8 @@
 import { BASE_URL, GOOGLE_CLIENT_SECRET } from '@/constants/GlobalConstants';
 import { tokenCache } from '@/helper/cache';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { AuthError, AuthRequestConfig, DiscoveryDocument, exchangeCodeAsync, makeRedirectUri, useAuthRequest } from 'expo-auth-session';
+import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as jose from 'jose';
@@ -27,7 +29,8 @@ const AuthContext = createContext({
   user: null as AuthUser | null,
   loading: true,
   loginWithGoogle: () => { },
-  loginWithApple: () => { },
+  signInWithApple: () => { },
+  signInWithAppleWebBrowser: () => { },
   logout: () => { },
   fetchWithAuth: async (url: string, option?: RequestInit) => Promise.resolve(new Response()),
   error: null as AuthError | null,
@@ -63,10 +66,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [request, response, promptAsync] = useAuthRequest(config, discovery);
   const isWeb = Platform.OS === "web";
+   const [appleRequest, appleResponse, promptAppleAsync] = useAuthRequest(
+    appleConfig,
+    appleDiscovery
+  );
 
   React.useEffect(() => {
     handleResponse();
   }, [response])
+
+  React.useEffect(() => {
+    handleAppleResponse();
+  }, [appleResponse]);
 
   React.useEffect(() => {
     const restoreSession = async () => {
@@ -166,6 +177,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     restoreSession();
   }, [isWeb]);
+
+  const handleNativeTokens = async (tokens: {
+    accessToken: string;
+    refreshToken: string;
+  }) => {
+    const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+      tokens;
+
+    console.log(
+      "Received initial access token:",
+      newAccessToken ? "exists" : "missing"
+    );
+    console.log(
+      "Received initial refresh token:",
+      newRefreshToken ? "exists" : "missing"
+    );
+
+    // Store tokens in state
+    if (newAccessToken) setAccessToken(newAccessToken);
+    if (newRefreshToken) setRefreshToken(newRefreshToken);
+
+    // Save tokens to secure storage for persistence
+    if (newAccessToken)
+      await tokenCache?.saveToken("accessToken", newAccessToken);
+    if (newRefreshToken)
+      await tokenCache?.saveToken("refreshToken", newRefreshToken);
+
+    // Decode the JWT access token to get user information
+    if (newAccessToken) {
+      const decoded = jose.decodeJwt(newAccessToken);
+      setUser(decoded as AuthUser);
+    }
+  };
 
   async function handleResponse() {
     if (response?.type === "success") {
@@ -272,7 +316,128 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginWithApple = async () => { };
+  const handleAppleResponse = async () => {
+    if (appleResponse?.type === "success") {
+      try {
+        const { code } = appleResponse.params;
+        const response = await exchangeCodeAsync(
+          {
+            clientId: "apple",
+            code,
+            redirectUri: makeRedirectUri(),
+            extraParams: {
+              platform: Platform.OS,
+            },
+          },
+          appleDiscovery
+        );
+        console.log("response", response);
+        if (isWeb) {
+          // For web: The server sets the tokens in HTTP-only cookies
+          // We just need to get the user data from the response
+          const sessionResponse = await fetch(`${BASE_URL}/api/auth/session`, {
+            method: "GET",
+            credentials: "include",
+          });
+
+          if (sessionResponse.ok) {
+            const sessionData = await sessionResponse.json();
+            setUser(sessionData as AuthUser);
+          }
+        } else {
+          // For native: The server returns both tokens in the response
+          // We need to store these tokens securely and decode the user data
+          await handleNativeTokens({
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken!,
+          });
+        }
+      } catch (e) {
+        console.log("Error exchanging code:", e);
+      }
+    } else if (appleResponse?.type === "cancel") {
+      console.log("appleResponse cancelled");
+    } else if (appleResponse?.type === "error") {
+      console.log("appleResponse error");
+    }
+  };
+
+  const signInWithApple = async () => { 
+    try {
+      const rawNonce = randomUUID();
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: rawNonce,
+      });
+
+      // console.log("🍎 credential", JSON.stringify(credential, null, 2));
+
+      if (credential.fullName?.givenName && credential.email) {
+        // This is the first sign in
+        // This is our only chance to get the user's name and email
+        // We need to store this info in our database
+        // You can handle this on the server side as well, just keep in mind that
+        // Apple only provides name and email on the first sign in
+        // On subsequent sign ins, these fields will be null
+        console.log("🍎 first sign in");
+      }
+
+      // Send both the identity token and authorization code to server
+      const appleResponse = await fetch(
+        `${BASE_URL}/api/auth/apple/apple-native`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            identityToken: credential.identityToken,
+            rawNonce, // Use the rawNonce we generated and passed to Apple
+
+            // IMPORTANT:
+            // Apple only provides name and email on the first sign in
+            // On subsequent sign ins, these fields will be null
+            // We need to store the user info from the first sign in in our database
+            // And retrieve it on subsequent sign ins using the stable user ID
+            givenName: credential.fullName?.givenName,
+            familyName: credential.fullName?.familyName,
+            email: credential.email,
+          }),
+        }
+      );
+
+      const responseText = await appleResponse.text();
+      
+      if (!appleResponse.ok) {
+        console.error("🍎 Apple auth failed:", appleResponse.status, responseText);
+        throw new Error(`Authentication failed: ${responseText.substring(0, 100)}`);
+      }
+      
+      const tokens = JSON.parse(responseText);
+      await handleNativeTokens(tokens);
+      
+      // Navigate to the protected route after successful authentication
+      router.replace('/(protected)/(tabs)');
+    } catch (e) {
+      console.log(e);
+      // handleAppleAuthError(e);
+    }
+  };
+
+  const signInWithAppleWebBrowser = async () => {
+    try {
+      if (!appleRequest) {
+        console.log("No appleRequest");
+        return;
+      }
+      await promptAppleAsync();
+    } catch (e) {
+      console.log(e);
+    }
+  };
 
   const logout = async () => {
     if (isWeb) {
@@ -360,7 +525,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginWithApple, logout, fetchWithAuth, error: null }}>
+    <AuthContext.Provider value={{ user, loading, loginWithGoogle, signInWithApple, signInWithAppleWebBrowser, logout, fetchWithAuth, error: null }}>
       {children}
     </AuthContext.Provider>
   );

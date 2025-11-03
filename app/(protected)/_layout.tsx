@@ -2,7 +2,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Redirect, Slot } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import 'react-native-reanimated';
+// import 'react-native-reanimated';
 
 export default function ProtectedLayout() {
   const authContext = useAuth()

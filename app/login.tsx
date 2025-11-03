@@ -1,7 +1,8 @@
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import React from 'react';
-import { Dimensions, Image, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -23,10 +24,20 @@ const LoginScreen = () => {
           <Text style={styles.socialButtonText}>Login with Google</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.socialButton} onPress={authContext?.loginWithApple}>
-          <Ionicons name="logo-apple" size={24} color="#fff" />
-          <Text style={styles.socialButtonText}>Login with Apple</Text>
-        </TouchableOpacity>
+        {Platform.OS === 'ios' ? (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+            cornerRadius={24}
+            style={styles.appleButton}
+            onPress={authContext?.signInWithApple}
+          />
+        ) : Platform.OS === 'web' ? (
+          <TouchableOpacity style={styles.socialButton} onPress={authContext?.signInWithAppleWebBrowser}>
+            <Ionicons name="logo-apple" size={24} color="#fff" />
+            <Text style={styles.socialButtonText}>Sign in with Apple</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -56,6 +67,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingVertical: 14,
     paddingHorizontal: 40,
+    marginBottom: 16,
+  },
+  appleButton: {
+    width: '100%',
+    height: 50,
     marginBottom: 16,
   },
   socialButtonText: {
