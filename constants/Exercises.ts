@@ -46,4 +46,30 @@ export const maxMuscleCapacity = {
     forearms: 100,
 };
 
-export const recoveryRatePerHour = 2; // Tune this value
+// Muscle-specific recovery rates (% per hour)
+// Based on muscle size and recovery science:
+// - Small muscles: 2.5-3.5% per hour (faster recovery, ~29-40 hours)
+// - Medium muscles: 1.8-2.2% per hour (moderate recovery, ~45-56 hours)
+// - Large muscles: 1.2-1.5% per hour (slower recovery, ~67-83 hours)
+export const recoveryRatePerHour = {
+    // Large muscle groups - slowest recovery (48-72+ hours)
+    quads: 1.2,          // ~83 hours for full recovery
+    hamstrings: 1.3,     // ~77 hours
+    glutes: 1.3,         // ~77 hours
+    lowerBack: 1.5,      // ~67 hours
+    
+    // Medium muscle groups - moderate recovery (36-56 hours)
+    pecs: 1.8,           // ~56 hours
+    lats: 1.8,           // ~56 hours
+    upperBack: 2.0,      // ~50 hours
+    core: 2.2,           // ~45 hours
+    
+    // Small muscle groups - faster recovery (24-40 hours)
+    anteriorDeltoids: 2.5,    // ~40 hours
+    medialDeltoids: 2.5,      // ~40 hours
+    posteriorDeltoids: 2.5,   // ~40 hours
+    triceps: 2.8,             // ~36 hours
+    biceps: 2.8,              // ~36 hours
+    calves: 3.0,              // ~33 hours
+    forearms: 3.5,            // ~29 hours
+};

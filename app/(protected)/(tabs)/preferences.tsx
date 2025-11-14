@@ -2,9 +2,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import ProfileButton from '../../../components/ProfileButton';
+import { recoveryRatePerHour as defaultRecoveryRates } from '../../../constants/Exercises';
+import { MuscleGroup } from '../../../constants/MuscleGroups';
+
+interface DrainSettings {
+  overallMultiplier: number;
+  metCoefficient: number;
+  repsCoefficient: number;
+  intensityCoefficient: number;
+  userBodyweight: number;
+}
 
 interface UserPreferences {
   enableNotifications: boolean;
@@ -15,7 +25,17 @@ interface UserPreferences {
   restTimerEnabled: boolean;
   autoLogWorkouts: boolean;
   showCaloriesBurned: boolean;
+  customRecoveryRates?: { [key in MuscleGroup]?: number };
+  drainSettings?: DrainSettings;
 }
+
+const DEFAULT_DRAIN_SETTINGS: DrainSettings = {
+  overallMultiplier: 5.0,
+  metCoefficient: 0.1,
+  repsCoefficient: 0.05,
+  intensityCoefficient: 0.5,
+  userBodyweight: 150,
+};
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   enableNotifications: true,
@@ -26,11 +46,23 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   restTimerEnabled: true,
   autoLogWorkouts: true,
   showCaloriesBurned: true,
+  drainSettings: DEFAULT_DRAIN_SETTINGS,
 };
 
 export default function PreferencesScreen() {
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [isSaving, setIsSaving] = useState(false);
+  const [showRecoveryRates, setShowRecoveryRates] = useState(false);
+  const [showAdvancedDrain, setShowAdvancedDrain] = useState(false);
+  const [customRates, setCustomRates] = useState<{ [key in MuscleGroup]?: number }>({});
+  const [drainSettings, setDrainSettings] = useState<DrainSettings>(DEFAULT_DRAIN_SETTINGS);
+  
+  // Local state for drain setting inputs
+  const [overallMultiplierInput, setOverallMultiplierInput] = useState('5.0');
+  const [metCoefInput, setMetCoefInput] = useState('0.10');
+  const [repsCoefInput, setRepsCoefInput] = useState('0.05');
+  const [intensityCoefInput, setIntensityCoefInput] = useState('0.50');
+  const [bodyweightInput, setBodyweightInput] = useState('150');
 
   // Load preferences when screen is focused
   useFocusEffect(
@@ -43,7 +75,38 @@ export default function PreferencesScreen() {
     try {
       const stored = await AsyncStorage.getItem('userPreferences');
       if (stored) {
-        setPreferences(JSON.parse(stored));
+        const loadedPrefs = JSON.parse(stored);
+        setPreferences(loadedPrefs);
+        setCustomRates(loadedPrefs.customRecoveryRates || {});
+        const loadedDrain = loadedPrefs.drainSettings || DEFAULT_DRAIN_SETTINGS;
+        setDrainSettings(loadedDrain);
+        
+        // Set input field states
+        setOverallMultiplierInput(loadedDrain.overallMultiplier.toFixed(1));
+        setMetCoefInput(loadedDrain.metCoefficient.toFixed(2));
+        setRepsCoefInput(loadedDrain.repsCoefficient.toFixed(2));
+        setIntensityCoefInput(loadedDrain.intensityCoefficient.toFixed(2));
+        setBodyweightInput(loadedDrain.userBodyweight.toFixed(0));
+      }
+      
+      // Also load custom recovery rates if stored separately
+      const storedRates = await AsyncStorage.getItem('customRecoveryRates');
+      if (storedRates) {
+        setCustomRates(JSON.parse(storedRates));
+      }
+
+      // Also load drain settings if stored separately
+      const storedDrain = await AsyncStorage.getItem('drainSettings');
+      if (storedDrain) {
+        const loadedDrain = JSON.parse(storedDrain);
+        setDrainSettings(loadedDrain);
+        
+        // Set input field states
+        setOverallMultiplierInput(loadedDrain.overallMultiplier.toFixed(1));
+        setMetCoefInput(loadedDrain.metCoefficient.toFixed(2));
+        setRepsCoefInput(loadedDrain.repsCoefficient.toFixed(2));
+        setIntensityCoefInput(loadedDrain.intensityCoefficient.toFixed(2));
+        setBodyweightInput(loadedDrain.userBodyweight.toFixed(0));
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -72,6 +135,84 @@ export default function PreferencesScreen() {
     savePreferences(newPreferences);
   };
 
+  const updateRecoveryRate = async (muscle: MuscleGroup, value: string) => {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue) || numValue < 0.1 || numValue > 10) return;
+    
+    const newRates = { ...customRates, [muscle]: numValue };
+    setCustomRates(newRates);
+    
+    // Save to AsyncStorage
+    await AsyncStorage.setItem('customRecoveryRates', JSON.stringify(newRates));
+    
+    // Also update preferences
+    const newPreferences = { ...preferences, customRecoveryRates: newRates };
+    savePreferences(newPreferences);
+  };
+
+  const resetRecoveryRates = async () => {
+    Alert.alert(
+      'Reset Recovery Rates',
+      'Reset all muscle recovery rates to default values?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            setCustomRates({});
+            await AsyncStorage.removeItem('customRecoveryRates');
+            const newPreferences = { ...preferences, customRecoveryRates: {} };
+            savePreferences(newPreferences);
+          },
+        },
+      ]
+    );
+  };
+
+  const updateDrainSetting = async <K extends keyof DrainSettings>(
+    key: K,
+    value: DrainSettings[K]
+  ) => {
+    const newSettings = { ...drainSettings, [key]: value };
+    setDrainSettings(newSettings);
+    
+    // Save to AsyncStorage
+    await AsyncStorage.setItem('drainSettings', JSON.stringify(newSettings));
+    
+    // Also update preferences
+    const newPreferences = { ...preferences, drainSettings: newSettings };
+    savePreferences(newPreferences);
+  };
+
+  const resetDrainSettings = async () => {
+    Alert.alert(
+      'Reset Drain Settings',
+      'Reset all muscle drain settings to default values?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            setDrainSettings(DEFAULT_DRAIN_SETTINGS);
+            
+            // Reset input field states
+            setOverallMultiplierInput(DEFAULT_DRAIN_SETTINGS.overallMultiplier.toFixed(1));
+            setMetCoefInput(DEFAULT_DRAIN_SETTINGS.metCoefficient.toFixed(2));
+            setRepsCoefInput(DEFAULT_DRAIN_SETTINGS.repsCoefficient.toFixed(2));
+            setIntensityCoefInput(DEFAULT_DRAIN_SETTINGS.intensityCoefficient.toFixed(2));
+            setBodyweightInput(DEFAULT_DRAIN_SETTINGS.userBodyweight.toFixed(0));
+            
+            await AsyncStorage.setItem('drainSettings', JSON.stringify(DEFAULT_DRAIN_SETTINGS));
+            const newPreferences = { ...preferences, drainSettings: DEFAULT_DRAIN_SETTINGS };
+            savePreferences(newPreferences);
+          },
+        },
+      ]
+    );
+  };
+
   const resetToDefaults = () => {
     Alert.alert(
       'Reset Preferences',
@@ -81,7 +222,20 @@ export default function PreferencesScreen() {
         {
           text: 'Reset',
           style: 'destructive',
-          onPress: () => savePreferences(DEFAULT_PREFERENCES),
+          onPress: () => {
+            // Reset all state
+            setCustomRates({});
+            setDrainSettings(DEFAULT_DRAIN_SETTINGS);
+            
+            // Reset drain input field states
+            setOverallMultiplierInput(DEFAULT_DRAIN_SETTINGS.overallMultiplier.toFixed(1));
+            setMetCoefInput(DEFAULT_DRAIN_SETTINGS.metCoefficient.toFixed(2));
+            setRepsCoefInput(DEFAULT_DRAIN_SETTINGS.repsCoefficient.toFixed(2));
+            setIntensityCoefInput(DEFAULT_DRAIN_SETTINGS.intensityCoefficient.toFixed(2));
+            setBodyweightInput(DEFAULT_DRAIN_SETTINGS.userBodyweight.toFixed(0));
+            
+            savePreferences(DEFAULT_PREFERENCES);
+          },
         },
       ]
     );
@@ -174,6 +328,55 @@ export default function PreferencesScreen() {
     </View>
   );
 
+  const RecoveryRateInput = ({
+    label,
+    muscle,
+    defaultValue,
+  }: {
+    label: string;
+    muscle: MuscleGroup;
+    defaultValue: number;
+  }) => {
+    const currentValue = customRates[muscle] ?? defaultValue;
+    const [inputValue, setInputValue] = useState(currentValue.toFixed(1));
+    const hoursToRecover = Math.round(100 / currentValue);
+    
+    // Update local state when customRates changes from outside
+    React.useEffect(() => {
+      setInputValue(currentValue.toFixed(1));
+    }, [currentValue]);
+    
+    const handleBlur = () => {
+      const numValue = parseFloat(inputValue);
+      if (!isNaN(numValue) && numValue >= 0.1 && numValue <= 10) {
+        updateRecoveryRate(muscle, inputValue);
+      } else {
+        // Reset to current value if invalid
+        setInputValue(currentValue.toFixed(1));
+      }
+    };
+    
+    return (
+      <View style={styles.recoveryRateRow}>
+        <View style={styles.recoveryRateTextContainer}>
+          <Text style={styles.recoveryRateLabel}>{label}</Text>
+          <Text style={styles.recoveryRateHint}>~{hoursToRecover}h to full recovery</Text>
+        </View>
+        <View style={styles.recoveryRateInputContainer}>
+          <TextInput
+            style={styles.recoveryRateInput}
+            value={inputValue}
+            onChangeText={setInputValue}
+            onBlur={handleBlur}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+          <Text style={styles.recoveryRateUnit}>%/hr</Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -226,6 +429,176 @@ export default function PreferencesScreen() {
             />
           </View>
 
+          {/* Muscle Drain Settings Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Muscle Fatigue Settings</Text>
+            <Text style={styles.sectionSubtitle}>Control how quickly muscles get tired during workouts</Text>
+
+            {/* Main Fatigue Sensitivity Input */}
+            <View style={styles.inputRow}>
+              <View style={styles.inputTextContainer}>
+                <Text style={styles.inputLabel}>Fatigue Sensitivity</Text>
+                <Text style={styles.inputHint}>
+                  {drainSettings.overallMultiplier <= 3 ? 'Light training' :
+                   drainSettings.overallMultiplier <= 7 ? 'Normal training' :
+                   drainSettings.overallMultiplier <= 12 ? 'Hard training' :
+                   'Extreme training'}
+                </Text>
+              </View>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={overallMultiplierInput}
+                  onChangeText={setOverallMultiplierInput}
+                  onBlur={() => {
+                    const num = parseFloat(overallMultiplierInput);
+                    if (!isNaN(num) && num >= 1 && num <= 20) {
+                      updateDrainSetting('overallMultiplier', num);
+                      setOverallMultiplierInput(num.toFixed(1));
+                    } else {
+                      setOverallMultiplierInput(drainSettings.overallMultiplier.toFixed(1));
+                    }
+                  }}
+                  keyboardType="decimal-pad"
+                  selectTextOnFocus
+                />
+                <Text style={styles.inputUnit}>x</Text>
+              </View>
+            </View>
+            <Text style={styles.rangeHint}>Range: 1.0 - 20.0 (Default: 5.0)</Text>
+
+            {/* Advanced Settings */}
+            <TouchableOpacity 
+              style={styles.advancedToggle}
+              onPress={() => setShowAdvancedDrain(!showAdvancedDrain)}
+            >
+              <Text style={styles.advancedToggleText}>Advanced Settings</Text>
+              <Text style={styles.toggleText}>{showAdvancedDrain ? 'Hide' : 'Show'}</Text>
+            </TouchableOpacity>
+
+            {showAdvancedDrain && (
+              <View style={styles.advancedContainer}>
+                <Text style={styles.advancedTitle}>Fine-tune Drain Formula</Text>
+                <Text style={styles.advancedSubtitle}>
+                  Drain = (MET × {drainSettings.metCoefficient.toFixed(2)}) + (Reps × {drainSettings.repsCoefficient.toFixed(2)}) + (Intensity × {drainSettings.intensityCoefficient.toFixed(2)})
+                </Text>
+
+                {/* MET Coefficient */}
+                <View style={styles.inputRow}>
+                  <View style={styles.inputTextContainer}>
+                    <Text style={styles.inputLabel}>MET Weight</Text>
+                    <Text style={styles.inputHint}>Exercise intensity contribution</Text>
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      value={metCoefInput}
+                      onChangeText={setMetCoefInput}
+                      onBlur={() => {
+                        const num = parseFloat(metCoefInput);
+                        if (!isNaN(num) && num >= 0 && num <= 0.5) {
+                          updateDrainSetting('metCoefficient', num);
+                          setMetCoefInput(num.toFixed(2));
+                        } else {
+                          setMetCoefInput(drainSettings.metCoefficient.toFixed(2));
+                        }
+                      }}
+                      keyboardType="decimal-pad"
+                      selectTextOnFocus
+                    />
+                  </View>
+                </View>
+                <Text style={styles.rangeHint}>Range: 0.0 - 0.5 (Default: 0.1)</Text>
+
+                {/* Reps Coefficient */}
+                <View style={styles.inputRow}>
+                  <View style={styles.inputTextContainer}>
+                    <Text style={styles.inputLabel}>Reps Weight</Text>
+                    <Text style={styles.inputHint}>Repetition count contribution</Text>
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      value={repsCoefInput}
+                      onChangeText={setRepsCoefInput}
+                      onBlur={() => {
+                        const num = parseFloat(repsCoefInput);
+                        if (!isNaN(num) && num >= 0 && num <= 0.2) {
+                          updateDrainSetting('repsCoefficient', num);
+                          setRepsCoefInput(num.toFixed(2));
+                        } else {
+                          setRepsCoefInput(drainSettings.repsCoefficient.toFixed(2));
+                        }
+                      }}
+                      keyboardType="decimal-pad"
+                      selectTextOnFocus
+                    />
+                  </View>
+                </View>
+                <Text style={styles.rangeHint}>Range: 0.0 - 0.2 (Default: 0.05)</Text>
+
+                {/* Intensity Coefficient */}
+                <View style={styles.inputRow}>
+                  <View style={styles.inputTextContainer}>
+                    <Text style={styles.inputLabel}>Intensity Weight</Text>
+                    <Text style={styles.inputHint}>% of 1RM contribution</Text>
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      value={intensityCoefInput}
+                      onChangeText={setIntensityCoefInput}
+                      onBlur={() => {
+                        const num = parseFloat(intensityCoefInput);
+                        if (!isNaN(num) && num >= 0 && num <= 2.0) {
+                          updateDrainSetting('intensityCoefficient', num);
+                          setIntensityCoefInput(num.toFixed(2));
+                        } else {
+                          setIntensityCoefInput(drainSettings.intensityCoefficient.toFixed(2));
+                        }
+                      }}
+                      keyboardType="decimal-pad"
+                      selectTextOnFocus
+                    />
+                  </View>
+                </View>
+                <Text style={styles.rangeHint}>Range: 0.0 - 2.0 (Default: 0.5)</Text>
+
+                {/* Bodyweight */}
+                <View style={styles.inputRow}>
+                  <View style={styles.inputTextContainer}>
+                    <Text style={styles.inputLabel}>Your Bodyweight</Text>
+                    <Text style={styles.inputHint}>For bodyweight exercises</Text>
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      value={bodyweightInput}
+                      onChangeText={setBodyweightInput}
+                      onBlur={() => {
+                        const num = parseFloat(bodyweightInput);
+                        if (!isNaN(num) && num >= 50 && num <= 500) {
+                          updateDrainSetting('userBodyweight', num);
+                          setBodyweightInput(num.toFixed(0));
+                        } else {
+                          setBodyweightInput(drainSettings.userBodyweight.toFixed(0));
+                        }
+                      }}
+                      keyboardType="decimal-pad"
+                      selectTextOnFocus
+                    />
+                    <Text style={styles.inputUnit}>lbs</Text>
+                  </View>
+                </View>
+                <Text style={styles.rangeHint}>Range: 50 - 500 (Default: 150)</Text>
+
+                <TouchableOpacity style={styles.actionButton} onPress={resetDrainSettings}>
+                  <Text style={styles.actionButtonText}>Reset Drain Settings to Default</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
           {/* Notifications & Feedback Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Notifications & Feedback</Text>
@@ -236,6 +609,50 @@ export default function PreferencesScreen() {
               value={preferences.enableHaptics}
               onValueChange={(value) => updatePreference('enableHaptics', value)}
             />
+          </View>
+
+          {/* Muscle Recovery Rates Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Muscle Recovery Rates</Text>
+                <Text style={styles.sectionSubtitle}>Customize how fast muscles recover (% per hour)</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowRecoveryRates(!showRecoveryRates)}>
+                <Text style={styles.toggleText}>{showRecoveryRates ? 'Hide' : 'Show'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {showRecoveryRates && (
+              <>
+                <View style={styles.recoveryRatesContainer}>
+                  <Text style={styles.recoveryGroupTitle}>Large Muscles (Slower Recovery)</Text>
+                  <RecoveryRateInput label="Quads" muscle="quads" defaultValue={defaultRecoveryRates.quads} />
+                  <RecoveryRateInput label="Hamstrings" muscle="hamstrings" defaultValue={defaultRecoveryRates.hamstrings} />
+                  <RecoveryRateInput label="Glutes" muscle="glutes" defaultValue={defaultRecoveryRates.glutes} />
+                  <RecoveryRateInput label="Lower Back" muscle="lowerBack" defaultValue={defaultRecoveryRates.lowerBack} />
+
+                  <Text style={styles.recoveryGroupTitle}>Medium Muscles</Text>
+                  <RecoveryRateInput label="Chest" muscle="pecs" defaultValue={defaultRecoveryRates.pecs} />
+                  <RecoveryRateInput label="Lats" muscle="lats" defaultValue={defaultRecoveryRates.lats} />
+                  <RecoveryRateInput label="Upper Back" muscle="upperBack" defaultValue={defaultRecoveryRates.upperBack} />
+                  <RecoveryRateInput label="Core" muscle="core" defaultValue={defaultRecoveryRates.core} />
+
+                  <Text style={styles.recoveryGroupTitle}>Small Muscles (Faster Recovery)</Text>
+                  <RecoveryRateInput label="Front Delts" muscle="anteriorDeltoids" defaultValue={defaultRecoveryRates.anteriorDeltoids} />
+                  <RecoveryRateInput label="Side Delts" muscle="medialDeltoids" defaultValue={defaultRecoveryRates.medialDeltoids} />
+                  <RecoveryRateInput label="Rear Delts" muscle="posteriorDeltoids" defaultValue={defaultRecoveryRates.posteriorDeltoids} />
+                  <RecoveryRateInput label="Triceps" muscle="triceps" defaultValue={defaultRecoveryRates.triceps} />
+                  <RecoveryRateInput label="Biceps" muscle="biceps" defaultValue={defaultRecoveryRates.biceps} />
+                  <RecoveryRateInput label="Calves" muscle="calves" defaultValue={defaultRecoveryRates.calves} />
+                  <RecoveryRateInput label="Forearms" muscle="forearms" defaultValue={defaultRecoveryRates.forearms} />
+                </View>
+
+                <TouchableOpacity style={styles.actionButton} onPress={resetRecoveryRates}>
+                  <Text style={styles.actionButtonText}>Reset Recovery Rates to Default</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
           {/* Data Management Section */}
@@ -454,5 +871,228 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: wp('3.8%'),
     fontWeight: '600',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: hp('1.5%'),
+  },
+  sectionSubtitle: {
+    fontSize: wp('3.2%'),
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  toggleText: {
+    fontSize: wp('3.8%'),
+    fontWeight: '600',
+    color: '#D89898',
+    marginTop: 4,
+  },
+  recoveryRatesContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: wp('4%'),
+    marginBottom: hp('1.5%'),
+  },
+  recoveryGroupTitle: {
+    fontSize: wp('4%'),
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: hp('2%'),
+    marginBottom: hp('1%'),
+  },
+  recoveryRateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: hp('1.5%'),
+    paddingHorizontal: wp('3%'),
+    borderRadius: 8,
+    marginBottom: hp('0.8%'),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  recoveryRateTextContainer: {
+    flex: 1,
+    marginRight: wp('3%'),
+  },
+  recoveryRateLabel: {
+    fontSize: wp('3.8%'),
+    fontWeight: '600',
+    color: '#181C20',
+  },
+  recoveryRateHint: {
+    fontSize: wp('3%'),
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  recoveryRateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    paddingHorizontal: wp('2%'),
+  },
+  recoveryRateInput: {
+    fontSize: wp('3.8%'),
+    fontWeight: '600',
+    color: '#181C20',
+    paddingVertical: hp('0.8%'),
+    paddingHorizontal: wp('2%'),
+    minWidth: wp('12%'),
+    textAlign: 'center',
+  },
+  recoveryRateUnit: {
+    fontSize: wp('3.2%'),
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  sliderContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: wp('4%'),
+    marginBottom: hp('1.5%'),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp('1%'),
+  },
+  sliderLabel: {
+    fontSize: wp('4.2%'),
+    fontWeight: '700',
+    color: '#181C20',
+  },
+  sliderValue: {
+    fontSize: wp('4.2%'),
+    fontWeight: '700',
+    color: '#D89898',
+  },
+  slider: {
+    width: '100%',
+    // height: 40,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: hp('0.5%'),
+  },
+  sliderLabelText: {
+    fontSize: wp('3%'),
+    color: '#9CA3AF',
+  },
+  sliderHint: {
+    fontSize: wp('3.5%'),
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: hp('1%'),
+    fontWeight: '600',
+  },
+  advancedToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: hp('1.5%'),
+    paddingHorizontal: wp('4%'),
+    borderRadius: 12,
+    marginBottom: hp('1.5%'),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  advancedToggleText: {
+    fontSize: wp('4%'),
+    fontWeight: '600',
+    color: '#374151',
+  },
+  advancedContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: wp('4%'),
+    marginBottom: hp('1.5%'),
+  },
+  advancedTitle: {
+    fontSize: wp('4.2%'),
+    fontWeight: '700',
+    color: '#181C20',
+    marginBottom: hp('0.5%'),
+  },
+  advancedSubtitle: {
+    fontSize: wp('3%'),
+    color: '#6B7280',
+    marginBottom: hp('2%'),
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: hp('1.5%'),
+    paddingHorizontal: wp('4%'),
+    borderRadius: 12,
+    marginBottom: hp('1%'),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  inputTextContainer: {
+    flex: 1,
+    marginRight: wp('3%'),
+  },
+  inputLabel: {
+    fontSize: wp('4%'),
+    fontWeight: '600',
+    color: '#181C20',
+    marginBottom: 4,
+  },
+  inputHint: {
+    fontSize: wp('3.2%'),
+    color: '#6B7280',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    paddingHorizontal: wp('2%'),
+  },
+  input: {
+    fontSize: wp('3.8%'),
+    fontWeight: '600',
+    color: '#181C20',
+    paddingVertical: hp('0.8%'),
+    paddingHorizontal: wp('2%'),
+    minWidth: wp('15%'),
+    textAlign: 'center',
+  },
+  inputUnit: {
+    fontSize: wp('3.2%'),
+    color: '#6B7280',
+    fontWeight: '500',
+    marginLeft: wp('1%'),
+  },
+  rangeHint: {
+    fontSize: wp('2.8%'),
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    marginBottom: hp('1.5%'),
+    textAlign: 'center',
+  },
+  advancedHint: {
+    fontSize: wp('3%'),
+    color: '#9CA3AF',
+    marginTop: hp('0.5%'),
+    fontStyle: 'italic',
   },
 });

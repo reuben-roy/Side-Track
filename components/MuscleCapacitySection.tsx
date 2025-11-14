@@ -78,11 +78,11 @@ export default function MuscleCapacitySection() {
       const now = Date.now();
       const hoursPassed = (now - lastExerciseTime) / (1000 * 60 * 60);
       if (hoursPassed > 0) {
-        setMuscleCapacity(prev => {
-          const recovered = fillMissingMuscleCapacity(applyRecovery(prev, hoursPassed));
+        (async () => {
+          const recovered = fillMissingMuscleCapacity(await applyRecovery(muscleCapacity, hoursPassed));
+          setMuscleCapacity(recovered);
           AsyncStorage.setItem('muscleCapacity', JSON.stringify(recovered));
-          return recovered;
-        });
+        })();
       }
     }
   }, [lastExerciseTime]);
@@ -90,14 +90,14 @@ export default function MuscleCapacitySection() {
   // Automatic recovery every hour as fallback
   useEffect(() => {
     const interval = setInterval(() => {
-      setMuscleCapacity(prev => {
-        const recovered = fillMissingMuscleCapacity(applyRecovery(prev, 1));
+      (async () => {
+        const recovered = fillMissingMuscleCapacity(await applyRecovery(muscleCapacity, 1));
+        setMuscleCapacity(recovered);
         AsyncStorage.setItem('muscleCapacity', JSON.stringify(recovered));
-        return recovered;
-      });
+      })();
     }, 60 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [muscleCapacity]);
 
   // Helper to group muscleGroups into pairs
   function getMusclePairs(arr: MuscleGroup[]): MuscleGroup[][] {

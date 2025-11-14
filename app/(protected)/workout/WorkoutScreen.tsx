@@ -89,7 +89,7 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       const repsNum = parseInt(repsList[repsIdx]);
       // Parse weight as number (e.g., '135 lbs' -> 135, or 'Bodyweight' remains string)
       const weightVal = weights[weightIdx].includes('lbs') ? parseInt(weights[weightIdx]) : weights[weightIdx];
-      const drain = calculateCapacityDrain(exercise, weightVal, repsNum);
+      const drain = await calculateCapacityDrain(exercise, weightVal, repsNum);
       muscleGroups.forEach(muscle => {
         if (drain[muscle]) {
           prevCapacity[muscle] = Math.max(0, (prevCapacity[muscle] || 100) - drain[muscle]!);
