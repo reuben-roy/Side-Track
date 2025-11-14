@@ -110,7 +110,9 @@ export default function MuscleCapacitySection() {
 
   return (
     <View style={styles.muscleSection}>
-      <Text style={styles.muscleHeader}>Muscle Capacity</Text>
+      <View style={styles.muscleTitleContainer}>
+        <Text style={styles.muscleHeader}>Muscle Capacity</Text>
+      </View>
       {getMusclePairs([...muscleGroups]).map((pair, idx) => (
         <View key={idx} style={styles.muscleRow}>
           {pair.map(muscle => {
@@ -135,64 +137,81 @@ export default function MuscleCapacitySection() {
           })}
         </View>
       ))}
-      <Text style={styles.info}>Indicates how much your muscles have recovered after previous exercises</Text>
+      <Text style={styles.info}>Shows how recovered your muscles are after previous exercises</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   muscleSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+  },
+  muscleTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  muscleIcon: {
+    fontSize: 24,
   },
   muscleHeader: {
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 12,
     color: '#181C20',
   },
   info: {
-    fontSize: 10,
+    fontSize: 12,
     textAlign: 'center',
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 8,
   },
   muscleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
     gap: 12,
   },
   muscleBarContainerHalf: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   muscleBoxContent: {
-    padding: 6,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.85)',
   },
   muscleName: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
     color: '#444',
     textTransform: 'capitalize',
   },
   musclePercent: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#222',
   },
   muscleProgressBarBg: {
     width: '100%',
-    height: 16,
+    height: 18,
     backgroundColor: '#e0e0e0',
-    borderRadius: 8,
+    borderRadius: 9,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
@@ -200,7 +219,7 @@ const styles = StyleSheet.create({
   },
   muscleProgressBarFill: {
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 9,
   },
   musclePercentContainer: {
     position: 'absolute',

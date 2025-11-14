@@ -1,4 +1,5 @@
 import ProfileButton from '@/components/ProfileButton';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { exercises } from '../../../constants/Exercises';
@@ -17,6 +18,8 @@ export default function HomeScreen() {
   const [weightIdx, setWeightIdx] = useState(0);
   const [repsIdx, setRepsIdx] = useState(0);
   const [showWorkout, setShowWorkout] = useState(false);
+  
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const selectedExercise = exercises[exerciseIdx];
   const WEIGHTS = selectedExercise.weights.map(w => typeof w === 'number' ? `${w} lbs` : w);
@@ -28,6 +31,20 @@ export default function HomeScreen() {
   }, [exerciseIdx]);
 
   const spin = () => {
+    // Animate button press
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     const newExerciseIdx = Math.floor(Math.random() * EXERCISES.length);
     setExerciseIdx(newExerciseIdx);
     setWeightIdx(Math.floor(Math.random() * exercises[newExerciseIdx].weights.length));
@@ -47,29 +64,71 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <ProfileButton top={50} right={20} />
-      <Text style={styles.header}>SideTrack</Text>
-      <Text style={styles.subHeader}>Work Out till you Pass Out</Text>
-      <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
-      <View style={styles.slotRow}>
-        <View style={styles.slotCol}>
-          <SlotPicker data={EXERCISES} selectedIndex={exerciseIdx} onSelect={setExerciseIdx} />
-        </View>
-        <View style={styles.slotCol}>
-          <SlotPicker data={WEIGHTS} selectedIndex={weightIdx} onSelect={setWeightIdx} />
-        </View>
-        <View style={styles.slotCol}>
-          <SlotPicker data={REPS} selectedIndex={repsIdx} onSelect={setRepsIdx} />
+    <LinearGradient
+      colors={['#FAFAFF', '#F0E6F6', '#E8D4F2']}
+      style={styles.container}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+    >
+      <ProfileButton top={57} right={20} />
+      
+      {/* Header Section */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.header}>SideTrack</Text>
+        <Text style={styles.subHeader}>Work Out till you Pass Out</Text>
+      </View>
+
+      {/* Title Section */}
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
+      </View>
+
+      {/* Slot Pickers Card */}
+      <View style={styles.slotCard}>
+        <View style={styles.slotRow}>
+          <View style={styles.slotCol}>
+            <Text style={styles.slotLabel}>Exercise</Text>
+            <SlotPicker data={EXERCISES} selectedIndex={exerciseIdx} onSelect={setExerciseIdx} />
+          </View>
+          <View style={styles.slotCol}>
+            <Text style={styles.slotLabel}>Weight</Text>
+            <SlotPicker data={WEIGHTS} selectedIndex={weightIdx} onSelect={setWeightIdx} />
+          </View>
+          <View style={styles.slotCol}>
+            <Text style={styles.slotLabel}>Reps</Text>
+            <SlotPicker data={REPS} selectedIndex={repsIdx} onSelect={setRepsIdx} />
+          </View>
         </View>
       </View>
-      <TouchableOpacity style={styles.pickButton} onPress={() => setShowWorkout(true)}>
-        <Text style={styles.pickButtonText}>Pick Exercise</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.spinButton} onPress={spin}>
-        <Text style={styles.spinButtonText}>Pick For Me</Text>
-      </TouchableOpacity>
-    </View>
+
+      {/* Buttons */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={styles.pickButton} 
+          onPress={() => setShowWorkout(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.pickButtonText}>Select Exercise</Text>
+        </TouchableOpacity>
+        
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          <TouchableOpacity 
+            style={styles.spinButton} 
+            onPress={spin}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#E6B3B3', '#D89898']}
+              style={styles.spinButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.spinButtonText}>Select For Me</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </LinearGradient>
   );
 }
 
@@ -175,11 +234,18 @@ function SlotPicker({
         <View
           style={{
             height: ITEM_HEIGHT,
-            width: '100%',
-            borderRadius: 8,
+            width: '90%',
+            borderRadius: 12,
             borderWidth: 2,
             borderColor: '#E6B3B3',
-            backgroundColor: 'rgba(255,255,255,0.2)',
+            backgroundColor: 'rgba(230, 179, 179, 0.15)',
+            shadowColor: '#E6B3B3',
+            shadowOffset: {
+              width: 0,
+              height: 2,
+            },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
           }}
         />
       </View>
@@ -190,46 +256,71 @@ function SlotPicker({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFF',
     paddingTop: 32,
   },
-  header: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  headerContainer: {
     marginTop: 25,
-    marginBottom: 5,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  header: {
+    fontSize: 36,
+    fontWeight: 'bold',
     color: '#181C20',
-    left: 20,
+    marginBottom: 4,
   },
   subHeader: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    letterSpacing: 0.5,
+  },
+  titleContainer: {
+    paddingHorizontal: 20,
     marginBottom: 24,
-    color: '#181C20',
-    left: 20,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#181C20',
-    marginBottom: 32,
-    marginTop:32,
-    left: 20,
+    textAlign: 'center',
+  },
+  slotCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   slotRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 16,
-    width: width - 32,
-    alignSelf: 'center',
+    width: '100%',
   },
   slotCol: {
     flex: 1,
     alignItems: 'center',
     marginHorizontal: 4,
-    backgroundColor: '#F5F2F2',
-    borderRadius: 32,
+    backgroundColor: '#F8F5F5',
+    borderRadius: 20,
     overflow: 'hidden',
+    paddingTop: 8,
+  },
+  slotLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   slotItem: {
     height: ITEM_HEIGHT,
@@ -242,12 +333,26 @@ const styles = StyleSheet.create({
     color: '#181C20',
     textAlign: 'center',
   },
+  buttonContainer: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
   spinButton: {
-    backgroundColor: '#E6B3B3',
     borderRadius: 40,
-    paddingVertical: 16,
-    marginHorizontal: 20,
-    marginVertical: 8,
+    overflow: 'hidden',
+    shadowColor: '#E6B3B3',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  spinButtonGradient: {
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   spinButtonText: {
     color: '#181C20',
@@ -256,10 +361,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   pickButton: {
-    backgroundColor: '#F5F2F2',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 40,
-    paddingVertical: 16,
-    marginHorizontal: 20,
+    paddingVertical: 18,
+    borderWidth: 2,
+    borderColor: '#E6B3B3',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
   },
   pickButtonText: {
     color: '#181C20',

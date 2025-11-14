@@ -2,9 +2,10 @@ import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 
 export default function TabLayout() {
@@ -14,20 +15,31 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#181C20',
-        tabBarInactiveTintColor: '#fff',
+        tabBarInactiveTintColor: '#999',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
-        tabBarStyle: {
-          // position: 'absolute',
-          // left: wp('4%'),
-          // right: wp('4%'),
-          // borderRadius: 40,
-          // height: hp('10%'),
-          backgroundColor: '#181C20',
-          paddingTop: hp('0.5%'),
-          // marginBottom: hp('2%'),
-        },
+        tabBarStyle: Platform.select({
+          ios: {
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+            elevation: 0,
+            height: hp('11%'),
+            paddingTop: hp('1%'),
+          },
+          default: {
+            backgroundColor: '#fff',
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(0, 0, 0, 0.1)',
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            height: hp('10%'),
+            paddingTop: hp('1%'),
+          },
+        }),
         tabBarShowLabel: false,
       }}
     >
@@ -35,9 +47,22 @@ export default function TabLayout() {
         name="index"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('4%') : wp('3%'), paddingVertical: focused ? hp('1%') : hp('0.5%'), alignItems: 'center', minWidth: wp('20%'), justifyContent: 'center' }}>
-              <IconSymbol size={wp('6%')} name="house.fill" color={focused ? '#181C20' : '#fff'} />
-              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: wp('4%'), marginLeft: wp('1%') }}>Home</Text>}
+            <View style={styles.tabContainer}>
+              {focused ? (
+                <LinearGradient
+                  colors={['#E6B3B3', '#D89898']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.activeTab}
+                >
+                  <IconSymbol size={wp('6%')} name="house.fill" color="#181C20" />
+                  <Text style={styles.activeLabel}>Home</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.inactiveTab}>
+                  <IconSymbol size={wp('6%')} name="house.fill" color="#999" />
+                </View>
+              )}
             </View>
           ),
         }}
@@ -46,9 +71,22 @@ export default function TabLayout() {
         name="stats"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ flexDirection: 'row', backgroundColor: focused ? '#B6F533' : 'transparent', borderRadius: 20, paddingHorizontal: focused ? wp('4%') : wp('3%'), paddingVertical: focused ? hp('1%') : hp('0.5%'), alignItems: 'center', minWidth: wp('20%'), justifyContent: 'center' }}>
-              <IconSymbol size={wp('6%')} name="rectangle.3.offgrid.fill" color={focused ? '#181C20' : '#fff'} />
-              {focused && <Text style={{ color: '#181C20', fontWeight: '600', fontSize: wp('4%'), marginLeft: wp('1%') }}>Stats</Text>}
+            <View style={styles.tabContainer}>
+              {focused ? (
+                <LinearGradient
+                  colors={['#E6B3B3', '#D89898']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.activeTab}
+                >
+                  <IconSymbol size={wp('6%')} name="chart.bar.fill" color="#181C20" />
+                  <Text style={styles.activeLabel}>Stats</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.inactiveTab}>
+                  <IconSymbol size={wp('6%')} name="chart.bar.fill" color="#999" />
+                </View>
+              )}
             </View>
           ),
         }}
@@ -56,3 +94,37 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  activeTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('1.2%'),
+    borderRadius: 24,
+    minWidth: wp('28%'),
+    shadowColor: '#E6B3B3',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  activeLabel: {
+    color: '#181C20',
+    fontWeight: '700',
+    fontSize: wp('4%'),
+    marginLeft: wp('2%'),
+  },
+  inactiveTab: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp('4%'),
+    paddingVertical: hp('1.2%'),
+  },
+});

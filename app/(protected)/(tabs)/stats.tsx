@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import CaloriesChart from '../../../components/CaloriesChart';
@@ -276,152 +277,215 @@ export default function StatsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <ProfileButton top={18} right={0} />
-      <Text style={styles.text}>Stats</Text>
-      
-      <CaloriesChart
-        workoutLogs={workoutLogs}
-        profile={profile}
-        selectedPeriod={selectedPeriod}
-        onPeriodChange={setSelectedPeriod}
-      />
-
-      <MuscleCapacitySection />
-
-      {/* --- Streak Counter, Personal Bests, Totals, Goal Progress --- */}
-      <View style={styles.statsSummaryGrid}>
-        {/* Week Goal Progress */}
-        <View style={styles.statsSummaryBox}>
-          <Text style={[styles.goalLabel, {color: '#B6F533'}]}>Week</Text>
-          <View style={styles.progressBarBgSmall}>
-            <View style={[styles.progressBar, { width: `${Math.min(goalProgress.week, 100)}%` }]} />
-          </View>
-          <Text style={styles.goalValue}>{goalProgress.week}%</Text>
-        </View>
-        {/* Month Goal Progress */}
-        <View style={styles.statsSummaryBox}>
-          <Text style={[styles.goalLabel, {color: '#B6F533'}]}>Month</Text>
-          <View style={styles.progressBarBgSmall}>
-            <View style={[styles.progressBar, { width: `${Math.min(goalProgress.month, 100)}%` }]} />
-          </View>
-          <Text style={styles.goalValue}>{goalProgress.month}%</Text>
-        </View>
-        <View style={styles.statsSummaryBox}>
-          <Text style={styles.totalsLabel}>Total Calories Burned:</Text>
-          <Text style={styles.calories}>{calories !== null ? calories + ' kcal' : '...'}</Text>
-        </View>
-        {/* Streak */}
-        <View style={styles.statsSummaryBox}>
-          <Text style={styles.streakLabel}>Streak</Text>
-          <Text style={styles.streakValue}>Current: {streak.current} days</Text>
-          <Text style={styles.streakValue}>Best: {streak.best} days</Text>
-        </View>
-        {/* This Month Totals */}
-        <View style={styles.statsSummaryBox}>
-          <Text style={styles.totalsLabel}>This Month</Text>
-          <Text style={styles.totalsValue}>Workouts: {monthlyTotals.workouts}</Text>
-          <Text style={styles.totalsValue}>Calories: {monthlyTotals.calories}</Text>
-          <Text style={styles.totalsValue}>Sets: {monthlyTotals.sets}</Text>
-          <Text style={styles.totalsValue}>Reps: {monthlyTotals.reps}</Text>
-        </View>
-        {/* All Time Totals */}
-        <View style={styles.statsSummaryBox}>
-          <Text style={styles.totalsLabel}>All Time</Text>
-          <Text style={styles.totalsValue}>W: {allTimeTotals.workouts}</Text>
-          <Text style={styles.totalsValue}>C: {allTimeTotals.calories}</Text>
-          <Text style={styles.totalsValue}>S: {allTimeTotals.sets}</Text>
-          <Text style={styles.totalsValue}>R: {allTimeTotals.reps}</Text>
-        </View>
-        {/* Personal Bests */}
-        {/* <View style={styles.statsSummaryBox}>
-          <Text style={styles.bestsLabel}>Personal Bests</Text>
-          {Object.keys(personalBests).length === 0 ? (
-            <Text style={styles.bestsValue}>No data</Text>
-          ) : (
-            Object.entries(personalBests).map(([exercise, best]) => (
-              <Text key={exercise} style={styles.bestsValue} numberOfLines={1}>
-                {exercise}: {best.maxWeight > 0 ? `${best.maxWeight} lbs` : '-'} / {best.maxReps > 0 ? `${best.maxReps} reps` : '-'}
-              </Text>
-            ))
-          )}
-        </View> */}
-      </View>
-      
-      <View style={styles.historySection}>
-        <Text style={styles.sectionTitle}>Workout History</Text>
-        {workoutLogs.length === 0 ? (
-          <Text style={styles.noWorkouts}>No workouts logged yet</Text>
-        ) : (
-          sortedDates.map((dateKey) => {
-        const dayData = groupedWorkouts[dateKey];
-        const formattedDate = new Date(dateKey).toLocaleDateString('en-US', {
-          weekday: 'long',
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        });
+    <LinearGradient
+      colors={['#FAFAFF', '#F0E6F6', '#E8D4F2']}
+      style={styles.container}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+    >
+      <ScrollView 
+        style={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <ProfileButton top={25} right={0} />
         
-        return (
-          <View key={dateKey} style={styles.dayGroup}>
-            <View style={styles.dayHeader}>
-              <Text style={styles.dayHeaderText}>{formattedDate}</Text>
-              <Text style={styles.dayCaloriesText}>{dayData.totalCalories} kcal</Text>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.header}>Stats</Text>
+          <Text style={styles.subHeader}>Track your progress and achievements</Text>
+        </View>
+
+        <CaloriesChart
+          workoutLogs={workoutLogs}
+          profile={profile}
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={setSelectedPeriod}
+        />
+
+        <MuscleCapacitySection />
+
+        {/* --- Streak Counter, Personal Bests, Totals, Goal Progress --- */}
+        <View style={styles.statsCardsContainer}>
+          {/* Week Goal Progress */}
+          <View style={styles.statsCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Week Goal</Text>
             </View>
-            <View style={styles.scrollableExercisesContainer}>
-              <ScrollView 
-                style={styles.scrollableExercises} 
-                nestedScrollEnabled={true}
-                showsVerticalScrollIndicator={true}
-                bounces={true}
-              >
-                {dayData.logs.map((log, exerciseIndex) => {
-                  const globalIndex = workoutLogs.findIndex(wl => wl === log);
-                  return (
-                    <View key={`${dateKey}-${exerciseIndex}`} style={styles.exerciseCard}>
-                      <View style={styles.exerciseHeader}>
-                        <Text style={styles.exerciseName}>{log.exercise}</Text>
-                        <View style={styles.headerRight}>
-                          <Text style={styles.workoutDate}>{formatDate(log.date)}</Text>
-                          <TouchableOpacity style={styles.optionsButton} onPress={() => toggleOptions(globalIndex)}>
-                            <Text style={styles.optionsIcon}>⋮</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                      <Text style={styles.setText}>
-                        {log.weight ? `${log.weight} lbs` : '-'} × {log.reps ? `${log.reps} reps` : '-'}
-                      </Text>
-                      {expandedOptions === globalIndex && (
-                        <View style={styles.optionsContainer}>
-                          <TouchableOpacity 
-                            style={styles.deleteButtonContainer}
-                            onPress={() => deleteWorkout(globalIndex)}
-                          >
-                            <Text style={styles.deleteButton}>Delete</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </ScrollView>
+            <View style={styles.progressBarBgSmall}>
+              <LinearGradient
+                colors={['#B6F533', '#8FD926']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.progressBar, { width: `${Math.min(goalProgress.week, 100)}%` }]}
+              />
+            </View>
+            <Text style={styles.goalValue}>{goalProgress.week}%</Text>
+          </View>
+          
+          {/* Month Goal Progress */}
+          <View style={styles.statsCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Month Goal</Text>
+            </View>
+            <View style={styles.progressBarBgSmall}>
+              <LinearGradient
+                colors={['#B6F533', '#8FD926']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.progressBar, { width: `${Math.min(goalProgress.month, 100)}%` }]}
+              />
+            </View>
+            <Text style={styles.goalValue}>{goalProgress.month}%</Text>
+          </View>
+          
+          {/* Total Calories */}
+          <View style={styles.statsCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Total Calories</Text>
+            </View>
+            <Text style={styles.calories}>{calories !== null ? calories + ' kcal' : '...'}</Text>
+          </View>
+          
+          {/* Streak */}
+          <View style={styles.statsCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Streak</Text>
+            </View>
+            <Text style={styles.streakValue}>Current: {streak.current} days</Text>
+            <Text style={styles.streakValue}>Best: {streak.best} days</Text>
+          </View>
+          
+          {/* This Month Totals */}
+          <View style={styles.statsCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>This Month</Text>
+            </View>
+            <View style={styles.statsRow}>
+              <Text style={styles.totalsValue}>Workouts: {monthlyTotals.workouts}</Text>
+              <Text style={styles.totalsValue}>Calories: {monthlyTotals.calories}</Text>
+            </View>
+            <View style={styles.statsRow}>
+              <Text style={styles.totalsValue}>Sets: {monthlyTotals.sets}</Text>
+              <Text style={styles.totalsValue}>Reps: {monthlyTotals.reps}</Text>
             </View>
           </View>
-        );
-          })
-        )}
-      </View>
-    </ScrollView>
+          
+          {/* All Time Totals */}
+          <View style={styles.statsCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>All Time</Text>
+            </View>
+            <View style={styles.statsRow}>
+              <Text style={styles.totalsValue}>Workouts: {allTimeTotals.workouts}</Text>
+              <Text style={styles.totalsValue}>Calories: {allTimeTotals.calories}</Text>
+            </View>
+            <View style={styles.statsRow}>
+              <Text style={styles.totalsValue}>Sets: {allTimeTotals.sets}</Text>
+              <Text style={styles.totalsValue}>Reps: {allTimeTotals.reps}</Text>
+            </View>
+          </View>
+        </View>
+        
+        {/* Workout History */}
+        <View style={styles.historySection}>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionTitle}>Workout History</Text>
+          </View>
+          {workoutLogs.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.noWorkouts}>No workouts logged yet</Text>
+              <Text style={styles.emptyStateSubtext}>Start your fitness journey today!</Text>
+            </View>
+          ) : (
+            sortedDates.map((dateKey) => {
+          const dayData = groupedWorkouts[dateKey];
+          const formattedDate = new Date(dateKey).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
+          
+          return (
+            <View key={dateKey} style={styles.dayGroup}>
+              <View style={styles.dayHeader}>
+                <Text style={styles.dayHeaderText}>{formattedDate}</Text>
+                <View style={styles.caloriesBadge}>
+                  <Text style={styles.dayCaloriesText}>{dayData.totalCalories} kcal</Text>
+                </View>
+              </View>
+              <View style={styles.scrollableExercisesContainer}>
+                <ScrollView 
+                  style={styles.scrollableExercises} 
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={true}
+                  bounces={true}
+                >
+                  {dayData.logs.map((log, exerciseIndex) => {
+                    const globalIndex = workoutLogs.findIndex(wl => wl === log);
+                    return (
+                      <View key={`${dateKey}-${exerciseIndex}`} style={styles.exerciseCard}>
+                        <View style={styles.exerciseHeader}>
+                          <Text style={styles.exerciseName}>{log.exercise}</Text>
+                          <View style={styles.headerRight}>
+                            <Text style={styles.workoutDate}>{formatDate(log.date)}</Text>
+                            <TouchableOpacity style={styles.optionsButton} onPress={() => toggleOptions(globalIndex)}>
+                              <Text style={styles.optionsIcon}>⋮</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <Text style={styles.setText}>
+                          {log.weight ? `${log.weight} lbs` : '-'} × {log.reps ? `${log.reps} reps` : '-'}
+                        </Text>
+                        {expandedOptions === globalIndex && (
+                          <View style={styles.optionsContainer}>
+                            <TouchableOpacity 
+                              style={styles.deleteButtonContainer}
+                              onPress={() => deleteWorkout(globalIndex)}
+                            >
+                              <Text style={styles.deleteButton}>Delete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          );
+            })
+          )}
+        </View>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFF',
+  },
+  scrollContent: {
     paddingTop: 32,
     paddingHorizontal: 20,
     paddingBottom: 20,
+  },
+  headerContainer: {
+    marginTop: 25,
+    marginBottom: 24,
+  },
+  header: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#181C20',
+    marginBottom: 4,
+  },
+  subHeader: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    letterSpacing: 0.5,
   },
   text: {
     fontSize: 28,
@@ -430,25 +494,81 @@ const styles = StyleSheet.create({
     marginTop: 25,
     marginBottom: 24,
   },
+  statsCardsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 24,
+  },
+  statsCard: {
+    width: `${(100 - 3) / 2}%`,
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statsRow: {
+    flexDirection: 'column',
+    gap: 4,
+  },
   calories: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#ED2737',
+    marginTop: 4,
   },
   historySection: {
     flex: 1,
+    marginBottom: 40,
+  },
+  sectionTitleContainer: {
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#181C20',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 20,
+    marginTop: 20,
+  },
+  emptyStateIcon: {
+    fontSize: 64,
     marginBottom: 16,
   },
   noWorkouts: {
-    fontSize: 16,
-    color: '#C2BABA',
+    fontSize: 18,
+    color: '#666',
     textAlign: 'center',
-    fontStyle: 'italic',
-    marginTop: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
   workoutCard: {
     backgroundColor: '#fff',
@@ -468,14 +588,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   exerciseName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#181C20',
     flex: 1,
   },
   workoutDate: {
-    fontSize: 14,
-    color: '#C2BABA',
+    fontSize: 12,
+    color: '#999',
     fontWeight: '500',
   },
   headerRight: {
@@ -487,8 +607,8 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   optionsIcon: {
-    fontSize: 18,
-    color: '#C2BABA',
+    fontSize: 20,
+    color: '#999',
     fontWeight: 'bold',
   },
   optionsContainer: {
@@ -501,9 +621,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   setText: {
-    fontSize: 16,
-    color: '#181C20',
+    fontSize: 14,
+    color: '#666',
     marginBottom: 4,
+    fontWeight: '500',
   },
   workoutContent: {
     flexDirection: 'row',
@@ -512,16 +633,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   deleteButtonContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: '#FFE5E5',
-    borderRadius: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
   statsSummaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 5,
-    // justifyContent: 'space-between',
     marginBottom: 20,
   },
   statsSummaryBox: {
@@ -541,8 +662,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   streakValue: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#181C20',
+    fontWeight: '500',
+    marginTop: 2,
   },
   goalLabel: {
     fontWeight: 'bold',
@@ -559,16 +682,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressBar: {
-    height: 12,
-    backgroundColor: '#ED2737',
+    height: '100%',
     borderRadius: 8,
   },
   goalValue: {
     fontWeight: 'bold',
     color: '#181C20',
-    fontSize: 16,
-    minWidth: 36,
-    textAlign: 'right',
+    fontSize: 20,
+    marginTop: 8,
   },
   totalsLabel: {
     fontWeight: 'bold',
@@ -577,8 +698,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   totalsValue: {
-    fontSize: 15,
-    color: '#181C20',
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
   },
   bestsLabel: {
     fontWeight: 'bold',
@@ -593,15 +715,14 @@ const styles = StyleSheet.create({
   deleteButton: {
     color: '#ED2737',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   progressBarBgSmall: {
-    flex: 2,
-    height: 12,
+    height: 10,
     backgroundColor: '#ECECEC',
     borderRadius: 8,
-    marginHorizontal: 8,
     overflow: 'hidden',
+    marginVertical: 8,
   },
   dayGroup: {
     marginBottom: 20,
@@ -610,33 +731,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   dayHeaderText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#181C20',
   },
+  caloriesBadge: {
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
   dayCaloriesText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#ED2737',
   },
   exerciseCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 8,
-    marginLeft: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    marginHorizontal: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#E6B3B3',
   },
   exerciseHeader: {
     flexDirection: 'row',
@@ -645,13 +774,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   scrollableExercisesContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    borderColor: '#E0E0E0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(224, 224, 224, 0.5)',
+    overflow: 'hidden',
   },
   scrollableExercises: {
     maxHeight: 200,
