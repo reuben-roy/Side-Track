@@ -91,6 +91,30 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="preferences"
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.tabContainer}>
+              {focused ? (
+                <LinearGradient
+                  colors={['#E6B3B3', '#D89898']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.activeTab}
+                >
+                  <IconSymbol size={wp('6%')} name="gearshape.fill" color="#181C20" />
+                  <Text style={styles.activeLabel}>Settings</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.inactiveTab}>
+                  <IconSymbol size={wp('6%')} name="gearshape.fill" color="#999" />
+                </View>
+              )}
+            </View>
+          ),
+        }}
+      />
     </Tabs>
   );
 }
