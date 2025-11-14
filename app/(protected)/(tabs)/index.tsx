@@ -157,11 +157,11 @@ function SlotPicker({
     return Math.round(offset / ITEM_TOTAL_HEIGHT);
   };
 
-  // Update parent every time the highlighted item changes
-  const handleScroll = (e: any) => {
+  // Only update parent when scrolling has completely stopped
+  const handleScrollEnd = (e: any) => {
     const offsetY = e.nativeEvent.contentOffset.y;
     const idx = getCurrentIndex(offsetY);
-    if (idx !== lastIndexRef.current && idx >= 0 && idx < data.length) {
+    if (idx >= 0 && idx < data.length) {
       lastIndexRef.current = idx;
       onSelect(idx);
     }
@@ -179,18 +179,17 @@ function SlotPicker({
           paddingVertical: ITEM_TOTAL_HEIGHT * Math.floor(VISIBLE_ITEMS / 2),
         }}
         snapToInterval={ITEM_TOTAL_HEIGHT}
-        decelerationRate="fast"
+        decelerationRate="normal"
         bounces={false}
         getItemLayout={(_, index) => ({
           length: ITEM_TOTAL_HEIGHT,
           offset: ITEM_TOTAL_HEIGHT * index,
           index,
         })}
-        onMomentumScrollEnd={handleScroll}
-        onScrollEndDrag={handleScroll}
+        onMomentumScrollEnd={handleScrollEnd}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true, listener: handleScroll }
+          { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
         renderItem={({ item, index }) => {
