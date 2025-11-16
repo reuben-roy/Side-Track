@@ -50,7 +50,7 @@ export default function TabLayout() {
             <View style={styles.tabContainer}>
               {focused ? (
                 <LinearGradient
-                  colors={['#E6B3B3', '#D89898']}
+                  colors={['#c3e5ecff', '#d9f1f6ff']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.activeTab}
@@ -74,7 +74,7 @@ export default function TabLayout() {
             <View style={styles.tabContainer}>
               {focused ? (
                 <LinearGradient
-                  colors={['#E6B3B3', '#D89898']}
+                  colors={['#c3e5ecff', '#d9f1f6ff']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.activeTab}
@@ -98,7 +98,7 @@ export default function TabLayout() {
             <View style={styles.tabContainer}>
               {focused ? (
                 <LinearGradient
-                  colors={['#E6B3B3', '#D89898']}
+                  colors={['#c3e5ecff', '#d9f1f6ff']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.activeTab}

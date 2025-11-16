@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { maxMuscleCapacity } from '../constants/Exercises';
 import { MuscleGroup, muscleGroups } from '../constants/MuscleGroups';
@@ -51,26 +52,31 @@ export default function MuscleCapacitySection() {
   const [muscleCapacity, setMuscleCapacity] = useState<MuscleCapacity>(DEFAULT_MUSCLE_CAPACITY);
   const [lastExerciseTime, setLastExerciseTime] = useState<number | null>(null);
 
-  // Load from AsyncStorage on mount and whenever logs change
-  useEffect(() => {
-    (async () => {
-      const stored = await AsyncStorage.getItem('muscleCapacity');
-      if (stored) setMuscleCapacity(fillMissingMuscleCapacity(JSON.parse(stored)));
-      // Find the most recent exercise log
-      const logsStr = await AsyncStorage.getItem('workoutLogs');
-      if (logsStr) {
-        const logs = JSON.parse(logsStr);
-        if (Array.isArray(logs) && logs.length > 0) {
-          // Find the latest log date
-          const latest = logs.reduce((max, log) => {
-            const t = new Date(log.date).getTime();
-            return t > max ? t : max;
-          }, 0);
-          setLastExerciseTime(latest);
-        }
+  // Load from AsyncStorage whenever the screen comes into focus
+  const loadMuscleCapacity = useCallback(async () => {
+    const stored = await AsyncStorage.getItem('muscleCapacity');
+    if (stored) setMuscleCapacity(fillMissingMuscleCapacity(JSON.parse(stored)));
+    // Find the most recent exercise log
+    const logsStr = await AsyncStorage.getItem('workoutLogs');
+    if (logsStr) {
+      const logs = JSON.parse(logsStr);
+      if (Array.isArray(logs) && logs.length > 0) {
+        // Find the latest log date
+        const latest = logs.reduce((max, log) => {
+          const t = new Date(log.date).getTime();
+          return t > max ? t : max;
+        }, 0);
+        setLastExerciseTime(latest);
       }
-    })();
+    }
   }, []);
+
+  // Reload muscle capacity whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadMuscleCapacity();
+    }, [loadMuscleCapacity])
+  );
 
   // On mount and whenever lastExerciseTime changes, apply recovery
   useEffect(() => {
@@ -218,7 +224,10 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   muscleProgressBarFill: {
-    height: '100%',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
     borderRadius: 9,
   },
   musclePercentContainer: {

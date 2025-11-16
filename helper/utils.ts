@@ -31,34 +31,59 @@ function estimate1RM(
 }
 
 const userEstimated1RMs: UserEstimated1RMs = {
-    'Deadlift': 315,
-    'Squat': 250,
-    'Bench Press': 180,
-    'Overhead Press': 120,
-    'Barbell Row': 180,
-    'Pull-Up': 220,
-    'Dumbbell Press': 120,
-    'Dumbbell Curl': 80,
-    'Dumbbell Lateral Raise': 50,
-    'Triceps Dip': 200,
-    'Lat Pulldown': 180,
-    'Seated Row': 200,
-    'Leg Press': 400,
-    'Calf Raise': 250,
-    'Hammer Curl': 80,
-    'Incline Bench Press': 160,
-    'Face Pull': 70,
-    'Cable Lateral Raise': 40,
-    'Front Squat': 220,
-    'Sumo Deadlift': 330,
-    'Hip Thrust': 350,
-    'Bulgarian Split Squat': 80,
-    'Machine Chest Press': 220,
-    'Machine Shoulder Press': 150,
-    'Preacher Curl': 90,
-    'Reverse Fly': 40,
-    'Rope Triceps Pushdown': 110,
+    'Deadlift': 185,
+    'Squat': 205,
+    'Bench Press': 145,
+    'Overhead Press': 95,
+    'Barbell Row': 145,
+    'Pull-Up': 175,
+    'Dumbbell Press': 95,
+    'Dumbbell Curl': 60,
+    'Dumbbell Lateral Raise': 35,
+    'Triceps Dip': 160,
+    'Lat Pulldown': 145,
+    'Seated Row': 160,
+    'Leg Press': 320,
+    'Calf Raise': 200,
+    'Hammer Curl': 60,
+    'Incline Bench Press': 125,
+    'Face Pull': 55,
+    'Cable Lateral Raise': 30,
+    'Front Squat': 175,
+    'Sumo Deadlift': 265,
+    'Hip Thrust': 280,
+    'Bulgarian Split Squat': 60,
+    'Machine Chest Press': 175,
+    'Machine Shoulder Press': 120,
+    'Preacher Curl': 70,
+    'Reverse Fly': 30,
+    'Rope Triceps Pushdown': 85,
 };
+
+// Get user-specific capacity limit (1RM) for an exercise
+async function getUserCapacityLimit(exerciseName: string): Promise<number> {
+    try {
+        // Search for any user's capacity limits (there should only be one logged-in user)
+        const allKeys = await AsyncStorage.getAllKeys();
+        const capacityKeys = allKeys.filter(key => key.startsWith('userCapacityLimits_'));
+        
+        // Get the first (and should be only) user's capacity limits
+        if (capacityKeys.length > 0) {
+            const limitsStr = await AsyncStorage.getItem(capacityKeys[0]);
+            if (limitsStr) {
+                const limits = JSON.parse(limitsStr);
+                if (limits[exerciseName] !== undefined) {
+                    return limits[exerciseName];
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading user capacity limit:', error);
+    }
+    
+    // Fall back to default hardcoded value
+    return userEstimated1RMs[exerciseName] ?? 100;
+}
 
 // Get drain settings from AsyncStorage or use defaults
 async function getDrainSettings() {
@@ -70,12 +95,12 @@ async function getDrainSettings() {
     } catch (error) {
         console.error('Error loading drain settings:', error);
     }
-    // Default values
+    // Default values - increased for more significant drain
     return {
-        overallMultiplier: 5.0,
-        metCoefficient: 0.1,
-        repsCoefficient: 0.05,
-        intensityCoefficient: 0.5,
+        overallMultiplier: 12.0,
+        metCoefficient: 0.15,
+        repsCoefficient: 0.08,
+        intensityCoefficient: 0.7,
         userBodyweight: 150,
     };
 }
@@ -100,7 +125,8 @@ export async function calculateCapacityDrain(
         effectiveWeightUsed = addedWeightMatch ? baseBodyweight + parseInt(addedWeightMatch[1]) : baseBodyweight;
     }
 
-    const user1RM = userEstimated1RMs[exerciseName] ?? estimate1RM(exerciseName, effectiveWeightUsed, repsCompleted);
+    // Get user-specific 1RM instead of using hardcoded value
+    const user1RM = await getUserCapacityLimit(exerciseName);
     const percentageOf1RM = user1RM > 0 ? effectiveWeightUsed / user1RM : 0;
 
     let intensityFactor: number;

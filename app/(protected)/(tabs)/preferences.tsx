@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import ProfileButton from '../../../components/ProfileButton';
-import { recoveryRatePerHour as defaultRecoveryRates } from '../../../constants/Exercises';
+import { recoveryRatePerHour as defaultRecoveryRates, exercises } from '../../../constants/Exercises';
 import { MuscleGroup } from '../../../constants/MuscleGroups';
+import { useUserCapacity } from '../../../context/UserCapacityContext';
 
 interface DrainSettings {
   overallMultiplier: number;
@@ -30,10 +30,10 @@ interface UserPreferences {
 }
 
 const DEFAULT_DRAIN_SETTINGS: DrainSettings = {
-  overallMultiplier: 5.0,
-  metCoefficient: 0.1,
-  repsCoefficient: 0.05,
-  intensityCoefficient: 0.5,
+  overallMultiplier: 8.0,  // Increased from 5.0 for faster fatigue
+  metCoefficient: 0.15,    // Increased from 0.1
+  repsCoefficient: 0.08,   // Increased from 0.05
+  intensityCoefficient: 0.7,  // Increased from 0.5
   userBodyweight: 150,
 };
 
@@ -54,14 +54,16 @@ export default function PreferencesScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [showRecoveryRates, setShowRecoveryRates] = useState(false);
   const [showAdvancedDrain, setShowAdvancedDrain] = useState(false);
+  const [showExerciseLimits, setShowExerciseLimits] = useState(false);
   const [customRates, setCustomRates] = useState<{ [key in MuscleGroup]?: number }>({});
   const [drainSettings, setDrainSettings] = useState<DrainSettings>(DEFAULT_DRAIN_SETTINGS);
+  const { capacityLimits, updateCapacityLimit, resetToDefaults: resetCapacityLimits, estimateFromAllWorkouts } = useUserCapacity();
   
   // Local state for drain setting inputs
-  const [overallMultiplierInput, setOverallMultiplierInput] = useState('5.0');
-  const [metCoefInput, setMetCoefInput] = useState('0.10');
-  const [repsCoefInput, setRepsCoefInput] = useState('0.05');
-  const [intensityCoefInput, setIntensityCoefInput] = useState('0.50');
+  const [overallMultiplierInput, setOverallMultiplierInput] = useState('8.0');
+  const [metCoefInput, setMetCoefInput] = useState('0.15');
+  const [repsCoefInput, setRepsCoefInput] = useState('0.08');
+  const [intensityCoefInput, setIntensityCoefInput] = useState('0.70');
   const [bodyweightInput, setBodyweightInput] = useState('150');
 
   // Load preferences when screen is focused
@@ -278,15 +280,12 @@ export default function PreferencesScreen() {
   }) => (
     <View style={styles.preferenceRow}>
       <View style={styles.preferenceTextContainer}>
-        <Text style={styles.preferenceLabel}>{label}</Text>
-        {description && <Text style={styles.preferenceDescription}>{description}</Text>}
+      <Text style={styles.preferenceLabel}>{label}</Text>
+      {description && <Text style={styles.preferenceDescription}>{description}</Text>}
       </View>
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: '#D1D5DB', true: '#E6B3B3' }}
-        thumbColor={value ? '#D89898' : '#F3F4F6'}
-        ios_backgroundColor="#D1D5DB"
       />
     </View>
   );
@@ -377,325 +376,450 @@ export default function PreferencesScreen() {
     );
   };
 
+  const ExerciseLimitInput = ({
+    exerciseName,
+    currentLimit,
+  }: {
+    exerciseName: string;
+    currentLimit: number;
+  }) => {
+    const [inputValue, setInputValue] = useState(currentLimit.toString());
+    
+    // Update local state when currentLimit changes from outside
+    React.useEffect(() => {
+      setInputValue(currentLimit.toString());
+    }, [currentLimit]);
+
+    const handleBlur = () => {
+      const numValue = parseFloat(inputValue);
+      if (!isNaN(numValue) && numValue >= 10 && numValue <= 1000) {
+        updateCapacityLimit(exerciseName, numValue);
+      } else {
+        setInputValue(currentLimit.toString());
+      }
+    };
+
+    return (
+      <View style={styles.recoveryRateRow}>
+        <View style={styles.recoveryRateTextContainer}>
+          <Text style={styles.recoveryRateLabel}>{exerciseName}</Text>
+          <Text style={styles.recoveryRateHint}>Estimated 1RM</Text>
+        </View>
+        <View style={styles.recoveryRateInputContainer}>
+          <TextInput
+            style={styles.recoveryRateInput}
+            value={inputValue}
+            onChangeText={setInputValue}
+            onBlur={handleBlur}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+          <Text style={styles.recoveryRateUnit}>lbs</Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#F8F9FA', '#FFFFFF']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.gradient}
+      <View style={styles.header}>
+        <Text style={styles.title}>Preferences</Text>
+        <ProfileButton />
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Preferences</Text>
-          <ProfileButton />
+        {/* General Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>General</Text>
+          
+          <SegmentedControl
+            label="Units"
+            options={[
+              { label: 'Imperial', value: 'imperial' },
+              { label: 'Metric', value: 'metric' },
+            ]}
+            selectedValue={preferences.units}
+            onValueChange={(value) => updatePreference('units', value as 'metric' | 'imperial')}
+          />
+
+          {/* <PreferenceRow
+            label="Dark Mode"
+            description="Use dark theme throughout the app"
+            value={preferences.darkMode}
+            onValueChange={(value) => updatePreference('darkMode', value)}
+          /> */}
         </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* General Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>General</Text>
-            
-            <SegmentedControl
-              label="Units"
-              options={[
-                { label: 'Imperial', value: 'imperial' },
-                { label: 'Metric', value: 'metric' },
-              ]}
-              selectedValue={preferences.units}
-              onValueChange={(value) => updatePreference('units', value as 'metric' | 'imperial')}
-            />
+        {/* Workout Section */}
+        {/* <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Workout</Text>
 
-            {/* <PreferenceRow
-              label="Dark Mode"
-              description="Use dark theme throughout the app"
-              value={preferences.darkMode}
-              onValueChange={(value) => updatePreference('darkMode', value)}
-            /> */}
-          </View>
+          <PreferenceRow
+            label="Rest Timer"
+            description="Show rest timer between sets"
+            value={preferences.restTimerEnabled}
+            onValueChange={(value) => updatePreference('restTimerEnabled', value)}
+          />
+        </View> */}
 
-          {/* Workout Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Workout</Text>
+        {/* Muscle Drain Settings Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Muscle Fatigue Settings</Text>
+          <Text style={styles.sectionSubtitle}>Control how quickly muscles get tired during workouts</Text>
 
-            <PreferenceRow
-              label="Rest Timer"
-              description="Show rest timer between sets"
-              value={preferences.restTimerEnabled}
-              onValueChange={(value) => updatePreference('restTimerEnabled', value)}
-            />
-          </View>
-
-          {/* Muscle Drain Settings Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Muscle Fatigue Settings</Text>
-            <Text style={styles.sectionSubtitle}>Control how quickly muscles get tired during workouts</Text>
-
-            {/* Main Fatigue Sensitivity Input */}
-            <View style={styles.inputRow}>
-              <View style={styles.inputTextContainer}>
-                <Text style={styles.inputLabel}>Fatigue Sensitivity</Text>
-                <Text style={styles.inputHint}>
-                  {drainSettings.overallMultiplier <= 3 ? 'Light training' :
-                   drainSettings.overallMultiplier <= 7 ? 'Normal training' :
-                   drainSettings.overallMultiplier <= 12 ? 'Hard training' :
-                   'Extreme training'}
-                </Text>
-              </View>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  value={overallMultiplierInput}
-                  onChangeText={setOverallMultiplierInput}
-                  onBlur={() => {
-                    const num = parseFloat(overallMultiplierInput);
-                    if (!isNaN(num) && num >= 1 && num <= 20) {
-                      updateDrainSetting('overallMultiplier', num);
-                      setOverallMultiplierInput(num.toFixed(1));
-                    } else {
-                      setOverallMultiplierInput(drainSettings.overallMultiplier.toFixed(1));
-                    }
-                  }}
-                  keyboardType="decimal-pad"
-                  selectTextOnFocus
-                />
-                <Text style={styles.inputUnit}>x</Text>
-              </View>
+          {/* Main Fatigue Sensitivity Input */}
+          <View style={styles.inputRow}>
+            <View style={styles.inputTextContainer}>
+              <Text style={styles.inputLabel}>Fatigue Sensitivity</Text>
+              <Text style={styles.inputHint}>
+                {drainSettings.overallMultiplier <= 3 ? 'Light training' :
+                  drainSettings.overallMultiplier <= 7 ? 'Normal training' :
+                  drainSettings.overallMultiplier <= 12 ? 'Hard training' :
+                  'Extreme training'}
+              </Text>
             </View>
-            <Text style={styles.rangeHint}>Range: 1.0 - 20.0 (Default: 5.0)</Text>
-
-            {/* Advanced Settings */}
-            <TouchableOpacity 
-              style={styles.advancedToggle}
-              onPress={() => setShowAdvancedDrain(!showAdvancedDrain)}
-            >
-              <Text style={styles.advancedToggleText}>Advanced Settings</Text>
-              <Text style={styles.toggleText}>{showAdvancedDrain ? 'Hide' : 'Show'}</Text>
-            </TouchableOpacity>
-
-            {showAdvancedDrain && (
-              <View style={styles.advancedContainer}>
-                <Text style={styles.advancedTitle}>Fine-tune Drain Formula</Text>
-                <Text style={styles.advancedSubtitle}>
-                  Drain = (MET × {drainSettings.metCoefficient.toFixed(2)}) + (Reps × {drainSettings.repsCoefficient.toFixed(2)}) + (Intensity × {drainSettings.intensityCoefficient.toFixed(2)})
-                </Text>
-
-                {/* MET Coefficient */}
-                <View style={styles.inputRow}>
-                  <View style={styles.inputTextContainer}>
-                    <Text style={styles.inputLabel}>MET Weight</Text>
-                    <Text style={styles.inputHint}>Exercise intensity contribution</Text>
-                  </View>
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={styles.input}
-                      value={metCoefInput}
-                      onChangeText={setMetCoefInput}
-                      onBlur={() => {
-                        const num = parseFloat(metCoefInput);
-                        if (!isNaN(num) && num >= 0 && num <= 0.5) {
-                          updateDrainSetting('metCoefficient', num);
-                          setMetCoefInput(num.toFixed(2));
-                        } else {
-                          setMetCoefInput(drainSettings.metCoefficient.toFixed(2));
-                        }
-                      }}
-                      keyboardType="decimal-pad"
-                      selectTextOnFocus
-                    />
-                  </View>
-                </View>
-                <Text style={styles.rangeHint}>Range: 0.0 - 0.5 (Default: 0.1)</Text>
-
-                {/* Reps Coefficient */}
-                <View style={styles.inputRow}>
-                  <View style={styles.inputTextContainer}>
-                    <Text style={styles.inputLabel}>Reps Weight</Text>
-                    <Text style={styles.inputHint}>Repetition count contribution</Text>
-                  </View>
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={styles.input}
-                      value={repsCoefInput}
-                      onChangeText={setRepsCoefInput}
-                      onBlur={() => {
-                        const num = parseFloat(repsCoefInput);
-                        if (!isNaN(num) && num >= 0 && num <= 0.2) {
-                          updateDrainSetting('repsCoefficient', num);
-                          setRepsCoefInput(num.toFixed(2));
-                        } else {
-                          setRepsCoefInput(drainSettings.repsCoefficient.toFixed(2));
-                        }
-                      }}
-                      keyboardType="decimal-pad"
-                      selectTextOnFocus
-                    />
-                  </View>
-                </View>
-                <Text style={styles.rangeHint}>Range: 0.0 - 0.2 (Default: 0.05)</Text>
-
-                {/* Intensity Coefficient */}
-                <View style={styles.inputRow}>
-                  <View style={styles.inputTextContainer}>
-                    <Text style={styles.inputLabel}>Intensity Weight</Text>
-                    <Text style={styles.inputHint}>% of 1RM contribution</Text>
-                  </View>
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={styles.input}
-                      value={intensityCoefInput}
-                      onChangeText={setIntensityCoefInput}
-                      onBlur={() => {
-                        const num = parseFloat(intensityCoefInput);
-                        if (!isNaN(num) && num >= 0 && num <= 2.0) {
-                          updateDrainSetting('intensityCoefficient', num);
-                          setIntensityCoefInput(num.toFixed(2));
-                        } else {
-                          setIntensityCoefInput(drainSettings.intensityCoefficient.toFixed(2));
-                        }
-                      }}
-                      keyboardType="decimal-pad"
-                      selectTextOnFocus
-                    />
-                  </View>
-                </View>
-                <Text style={styles.rangeHint}>Range: 0.0 - 2.0 (Default: 0.5)</Text>
-
-                {/* Bodyweight */}
-                <View style={styles.inputRow}>
-                  <View style={styles.inputTextContainer}>
-                    <Text style={styles.inputLabel}>Your Bodyweight</Text>
-                    <Text style={styles.inputHint}>For bodyweight exercises</Text>
-                  </View>
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={styles.input}
-                      value={bodyweightInput}
-                      onChangeText={setBodyweightInput}
-                      onBlur={() => {
-                        const num = parseFloat(bodyweightInput);
-                        if (!isNaN(num) && num >= 50 && num <= 500) {
-                          updateDrainSetting('userBodyweight', num);
-                          setBodyweightInput(num.toFixed(0));
-                        } else {
-                          setBodyweightInput(drainSettings.userBodyweight.toFixed(0));
-                        }
-                      }}
-                      keyboardType="decimal-pad"
-                      selectTextOnFocus
-                    />
-                    <Text style={styles.inputUnit}>lbs</Text>
-                  </View>
-                </View>
-                <Text style={styles.rangeHint}>Range: 50 - 500 (Default: 150)</Text>
-
-                <TouchableOpacity style={styles.actionButton} onPress={resetDrainSettings}>
-                  <Text style={styles.actionButtonText}>Reset Drain Settings to Default</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={overallMultiplierInput}
+                onChangeText={setOverallMultiplierInput}
+                onBlur={() => {
+                  const num = parseFloat(overallMultiplierInput);
+                  if (!isNaN(num) && num >= 1 && num <= 20) {
+                    updateDrainSetting('overallMultiplier', num);
+                    setOverallMultiplierInput(num.toFixed(1));
+                  } else {
+                    setOverallMultiplierInput(drainSettings.overallMultiplier.toFixed(1));
+                  }
+                }}
+                keyboardType="decimal-pad"
+                selectTextOnFocus
+              />
+              <Text style={styles.inputUnit}>x</Text>
+            </View>
           </View>
+          <Text style={styles.rangeHint}>Range: 1.0 - 20.0 (Default: 5.0)</Text>
 
-          {/* Notifications & Feedback Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notifications & Feedback</Text>
+          {/* Advanced Settings */}
+          <TouchableOpacity 
+            style={styles.advancedToggle}
+            onPress={() => setShowAdvancedDrain(!showAdvancedDrain)}
+          >
+            <Text style={styles.advancedToggleText}>Advanced Settings</Text>
+            <Text style={styles.toggleText}>{showAdvancedDrain ? 'Hide' : 'Show'}</Text>
+          </TouchableOpacity>
 
-            <PreferenceRow
-              label="Haptic Feedback"
-              description="Vibrate on button presses and actions"
-              value={preferences.enableHaptics}
-              onValueChange={(value) => updatePreference('enableHaptics', value)}
-            />
-          </View>
+          {showAdvancedDrain && (
+            <View style={styles.advancedContainer}>
+              <Text style={styles.advancedTitle}>Fine-tune Drain Formula</Text>
+              <Text style={styles.advancedSubtitle}>
+                Drain = (MET × {drainSettings.metCoefficient.toFixed(2)}) + (Reps × {drainSettings.repsCoefficient.toFixed(2)}) + (Intensity × {drainSettings.intensityCoefficient.toFixed(2)})
+              </Text>
 
-          {/* Muscle Recovery Rates Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Muscle Recovery Rates</Text>
-                <Text style={styles.sectionSubtitle}>Customize how fast muscles recover (% per hour)</Text>
+              {/* MET Coefficient */}
+              <View style={styles.inputRow}>
+                <View style={styles.inputTextContainer}>
+                  <Text style={styles.inputLabel}>MET Weight</Text>
+                  <Text style={styles.inputHint}>Exercise intensity contribution</Text>
+                </View>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    value={metCoefInput}
+                    onChangeText={setMetCoefInput}
+                    onBlur={() => {
+                      const num = parseFloat(metCoefInput);
+                      if (!isNaN(num) && num >= 0 && num <= 0.5) {
+                        updateDrainSetting('metCoefficient', num);
+                        setMetCoefInput(num.toFixed(2));
+                      } else {
+                        setMetCoefInput(drainSettings.metCoefficient.toFixed(2));
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                    selectTextOnFocus
+                  />
+                </View>
               </View>
-              <TouchableOpacity onPress={() => setShowRecoveryRates(!showRecoveryRates)}>
-                <Text style={styles.toggleText}>{showRecoveryRates ? 'Hide' : 'Show'}</Text>
+              <Text style={styles.rangeHint}>Range: 0.0 - 0.5 (Default: 0.1)</Text>
+
+              {/* Reps Coefficient */}
+              <View style={styles.inputRow}>
+                <View style={styles.inputTextContainer}>
+                  <Text style={styles.inputLabel}>Reps Weight</Text>
+                  <Text style={styles.inputHint}>Repetition count contribution</Text>
+                </View>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    value={repsCoefInput}
+                    onChangeText={setRepsCoefInput}
+                    onBlur={() => {
+                      const num = parseFloat(repsCoefInput);
+                      if (!isNaN(num) && num >= 0 && num <= 0.2) {
+                        updateDrainSetting('repsCoefficient', num);
+                        setRepsCoefInput(num.toFixed(2));
+                      } else {
+                        setRepsCoefInput(drainSettings.repsCoefficient.toFixed(2));
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                    selectTextOnFocus
+                  />
+                </View>
+              </View>
+              <Text style={styles.rangeHint}>Range: 0.0 - 0.2 (Default: 0.05)</Text>
+
+              {/* Intensity Coefficient */}
+              <View style={styles.inputRow}>
+                <View style={styles.inputTextContainer}>
+                  <Text style={styles.inputLabel}>Intensity Weight</Text>
+                  <Text style={styles.inputHint}>% of 1RM contribution</Text>
+                </View>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    value={intensityCoefInput}
+                    onChangeText={setIntensityCoefInput}
+                    onBlur={() => {
+                      const num = parseFloat(intensityCoefInput);
+                      if (!isNaN(num) && num >= 0 && num <= 2.0) {
+                        updateDrainSetting('intensityCoefficient', num);
+                        setIntensityCoefInput(num.toFixed(2));
+                      } else {
+                        setIntensityCoefInput(drainSettings.intensityCoefficient.toFixed(2));
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                    selectTextOnFocus
+                  />
+                </View>
+              </View>
+              <Text style={styles.rangeHint}>Range: 0.0 - 2.0 (Default: 0.5)</Text>
+
+              {/* Bodyweight */}
+              <View style={styles.inputRow}>
+                <View style={styles.inputTextContainer}>
+                  <Text style={styles.inputLabel}>Your Bodyweight</Text>
+                  <Text style={styles.inputHint}>For bodyweight exercises</Text>
+                </View>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    value={bodyweightInput}
+                    onChangeText={setBodyweightInput}
+                    onBlur={() => {
+                      const num = parseFloat(bodyweightInput);
+                      if (!isNaN(num) && num >= 50 && num <= 500) {
+                        updateDrainSetting('userBodyweight', num);
+                        setBodyweightInput(num.toFixed(0));
+                      } else {
+                        setBodyweightInput(drainSettings.userBodyweight.toFixed(0));
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                    selectTextOnFocus
+                  />
+                  <Text style={styles.inputUnit}>lbs</Text>
+                </View>
+              </View>
+              <Text style={styles.rangeHint}>Range: 50 - 500 (Default: 150)</Text>
+
+              <TouchableOpacity style={styles.actionButton} onPress={resetDrainSettings}>
+                <Text style={styles.actionButtonText}>Reset Drain Settings to Default</Text>
               </TouchableOpacity>
             </View>
+          )}
+        </View>
 
-            {showRecoveryRates && (
-              <>
-                <View style={styles.recoveryRatesContainer}>
-                  <Text style={styles.recoveryGroupTitle}>Large Muscles (Slower Recovery)</Text>
-                  <RecoveryRateInput label="Quads" muscle="quads" defaultValue={defaultRecoveryRates.quads} />
-                  <RecoveryRateInput label="Hamstrings" muscle="hamstrings" defaultValue={defaultRecoveryRates.hamstrings} />
-                  <RecoveryRateInput label="Glutes" muscle="glutes" defaultValue={defaultRecoveryRates.glutes} />
-                  <RecoveryRateInput label="Lower Back" muscle="lowerBack" defaultValue={defaultRecoveryRates.lowerBack} />
+        {/* Notifications & Feedback Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notifications & Feedback</Text>
 
-                  <Text style={styles.recoveryGroupTitle}>Medium Muscles</Text>
-                  <RecoveryRateInput label="Chest" muscle="pecs" defaultValue={defaultRecoveryRates.pecs} />
-                  <RecoveryRateInput label="Lats" muscle="lats" defaultValue={defaultRecoveryRates.lats} />
-                  <RecoveryRateInput label="Upper Back" muscle="upperBack" defaultValue={defaultRecoveryRates.upperBack} />
-                  <RecoveryRateInput label="Core" muscle="core" defaultValue={defaultRecoveryRates.core} />
+          <PreferenceRow
+            label="Haptic Feedback"
+            description="Vibrate on button presses and actions"
+            value={preferences.enableHaptics}
+            onValueChange={(value) => updatePreference('enableHaptics', value)}
+          />
+        </View>
 
-                  <Text style={styles.recoveryGroupTitle}>Small Muscles (Faster Recovery)</Text>
-                  <RecoveryRateInput label="Front Delts" muscle="anteriorDeltoids" defaultValue={defaultRecoveryRates.anteriorDeltoids} />
-                  <RecoveryRateInput label="Side Delts" muscle="medialDeltoids" defaultValue={defaultRecoveryRates.medialDeltoids} />
-                  <RecoveryRateInput label="Rear Delts" muscle="posteriorDeltoids" defaultValue={defaultRecoveryRates.posteriorDeltoids} />
-                  <RecoveryRateInput label="Triceps" muscle="triceps" defaultValue={defaultRecoveryRates.triceps} />
-                  <RecoveryRateInput label="Biceps" muscle="biceps" defaultValue={defaultRecoveryRates.biceps} />
-                  <RecoveryRateInput label="Calves" muscle="calves" defaultValue={defaultRecoveryRates.calves} />
-                  <RecoveryRateInput label="Forearms" muscle="forearms" defaultValue={defaultRecoveryRates.forearms} />
-                </View>
-
-                <TouchableOpacity style={styles.actionButton} onPress={resetRecoveryRates}>
-                  <Text style={styles.actionButtonText}>Reset Recovery Rates to Default</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-
-          {/* Data Management Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Data Management</Text>
-            
-            <TouchableOpacity style={styles.actionButton} onPress={resetToDefaults}>
-              <Text style={styles.actionButtonText}>Reset to Defaults</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.dangerButton} 
-              onPress={() => {
-                Alert.alert(
-                  'Confirm Delete',
-                  'Are you absolutely sure? This will permanently delete all your data.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Yes, Delete Everything',
-                      style: 'destructive',
-                      onPress: clearAllData,
-                    },
-                  ]
-                );
-              }}
-            >
-              <Text style={styles.dangerButtonText}>Clear All Data</Text>
+        {/* Muscle Recovery Rates Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Muscle Recovery Rates</Text>
+              <Text style={styles.sectionSubtitle}>Customize how fast muscles recover (% per hour)</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowRecoveryRates(!showRecoveryRates)}>
+              <Text style={styles.toggleText}>{showRecoveryRates ? 'Hide' : 'Show'}</Text>
             </TouchableOpacity>
           </View>
 
-          {/* App Info */}
-          <View style={styles.appInfo}>
-            <Text style={styles.appInfoText}>Side-Track v1.0.0</Text>
-          </View>
-        </ScrollView>
+          {showRecoveryRates && (
+            <>
+              <View style={styles.recoveryRatesContainer}>
+                <Text style={styles.recoveryGroupTitle}>Large Muscles (Slower Recovery)</Text>
+                <RecoveryRateInput label="Quads" muscle="quads" defaultValue={defaultRecoveryRates.quads} />
+                <RecoveryRateInput label="Hamstrings" muscle="hamstrings" defaultValue={defaultRecoveryRates.hamstrings} />
+                <RecoveryRateInput label="Glutes" muscle="glutes" defaultValue={defaultRecoveryRates.glutes} />
+                <RecoveryRateInput label="Lower Back" muscle="lowerBack" defaultValue={defaultRecoveryRates.lowerBack} />
 
-        {isSaving && (
-          <View style={styles.savingIndicator}>
-            <Text style={styles.savingText}>Saved ✓</Text>
+                <Text style={styles.recoveryGroupTitle}>Medium Muscles</Text>
+                <RecoveryRateInput label="Chest" muscle="pecs" defaultValue={defaultRecoveryRates.pecs} />
+                <RecoveryRateInput label="Lats" muscle="lats" defaultValue={defaultRecoveryRates.lats} />
+                <RecoveryRateInput label="Upper Back" muscle="upperBack" defaultValue={defaultRecoveryRates.upperBack} />
+                <RecoveryRateInput label="Core" muscle="core" defaultValue={defaultRecoveryRates.core} />
+
+                <Text style={styles.recoveryGroupTitle}>Small Muscles (Faster Recovery)</Text>
+                <RecoveryRateInput label="Front Delts" muscle="anteriorDeltoids" defaultValue={defaultRecoveryRates.anteriorDeltoids} />
+                <RecoveryRateInput label="Side Delts" muscle="medialDeltoids" defaultValue={defaultRecoveryRates.medialDeltoids} />
+                <RecoveryRateInput label="Rear Delts" muscle="posteriorDeltoids" defaultValue={defaultRecoveryRates.posteriorDeltoids} />
+                <RecoveryRateInput label="Triceps" muscle="triceps" defaultValue={defaultRecoveryRates.triceps} />
+                <RecoveryRateInput label="Biceps" muscle="biceps" defaultValue={defaultRecoveryRates.biceps} />
+                <RecoveryRateInput label="Calves" muscle="calves" defaultValue={defaultRecoveryRates.calves} />
+                <RecoveryRateInput label="Forearms" muscle="forearms" defaultValue={defaultRecoveryRates.forearms} />
+              </View>
+
+              <TouchableOpacity style={styles.actionButton} onPress={resetRecoveryRates}>
+                <Text style={styles.actionButtonText}>Reset Recovery Rates to Default</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Exercise Capacity Limits Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Exercise Capacity Limits</Text>
+              <Text style={styles.sectionSubtitle}>Set your estimated 1-rep max for each exercise</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowExerciseLimits(!showExerciseLimits)}>
+              <Text style={styles.toggleText}>{showExerciseLimits ? 'Hide' : 'Show'}</Text>
+            </TouchableOpacity>
           </View>
-        )}
-      </LinearGradient>
+
+          {showExerciseLimits && (
+            <>
+              <View style={styles.recoveryRatesContainer}>
+                <Text style={styles.recoveryGroupTitle}>Personalized Exercise Limits</Text>
+                <Text style={styles.sectionSubtitle}>
+                  These values help calculate workout intensity. Set to your estimated 1-rep max or personal best for each exercise.
+                </Text>
+                
+                {exercises.map((exercise) => (
+                  <ExerciseLimitInput
+                    key={exercise.name}
+                    exerciseName={exercise.name}
+                    currentLimit={capacityLimits[exercise.name] || 0}
+                  />
+                ))}
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#10B981', borderColor: '#059669' }]} 
+                onPress={async () => {
+                  Alert.alert(
+                    'Estimate from Workouts',
+                    'Analyze all your workout logs and automatically update your 1RM estimates based on your best performances?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Estimate',
+                        onPress: async () => {
+                          setIsSaving(true);
+                          const updatedCount = await estimateFromAllWorkouts();
+                          setIsSaving(false);
+                          if (updatedCount > 0) {
+                            Alert.alert(
+                              'Success!',
+                              `Updated ${updatedCount} exercise limit${updatedCount > 1 ? 's' : ''} based on your workout history.`
+                            );
+                          } else {
+                            Alert.alert(
+                              'No Updates',
+                              'Your current limits are already at or above your workout performances.'
+                            );
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
+                  Auto-Estimate from Workout History
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.actionButton} 
+                onPress={() => {
+                  Alert.alert(
+                    'Reset Exercise Limits',
+                    'Reset all exercise capacity limits to default values?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Reset',
+                        style: 'destructive',
+                        onPress: resetCapacityLimits,
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.actionButtonText}>Reset Exercise Limits to Default</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Data Management Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Data Management</Text>
+          
+          <TouchableOpacity style={styles.actionButton} onPress={resetToDefaults}>
+            <Text style={styles.actionButtonText}>Reset to Defaults</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.dangerButton} 
+            onPress={() => {
+              Alert.alert(
+                'Confirm Delete',
+                'Are you absolutely sure? This will permanently delete all your data.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Yes, Delete Everything',
+                    style: 'destructive',
+                    onPress: clearAllData,
+                  },
+                ]
+              );
+            }}
+          >
+            <Text style={styles.dangerButtonText}>Clear All Data</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* App Info */}
+        <View style={styles.appInfo}>
+          <Text style={styles.appInfoText}>Side-Track v1.0.0</Text>
+        </View>
+      </ScrollView>
+
+      {isSaving && (
+        <View style={styles.savingIndicator}>
+          <Text style={styles.savingText}>Saved ✓</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -886,7 +1010,7 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: wp('3.8%'),
     fontWeight: '600',
-    color: '#D89898',
+    color: '#808080',
     marginTop: 4,
   },
   recoveryRatesContainer: {
@@ -948,53 +1072,6 @@ const styles = StyleSheet.create({
     fontSize: wp('3.2%'),
     color: '#6B7280',
     fontWeight: '500',
-  },
-  sliderContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: wp('4%'),
-    marginBottom: hp('1.5%'),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  sliderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: hp('1%'),
-  },
-  sliderLabel: {
-    fontSize: wp('4.2%'),
-    fontWeight: '700',
-    color: '#181C20',
-  },
-  sliderValue: {
-    fontSize: wp('4.2%'),
-    fontWeight: '700',
-    color: '#D89898',
-  },
-  slider: {
-    width: '100%',
-    // height: 40,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: hp('0.5%'),
-  },
-  sliderLabelText: {
-    fontSize: wp('3%'),
-    color: '#9CA3AF',
-  },
-  sliderHint: {
-    fontSize: wp('3.5%'),
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: hp('1%'),
-    fontWeight: '600',
   },
   advancedToggle: {
     flexDirection: 'row',

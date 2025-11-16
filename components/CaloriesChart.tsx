@@ -225,7 +225,7 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
           initialSpacing={initialSpacing}
           spacing={spacing}
           barBorderRadius={8}
-          showGradient
+          // showGradient
           yAxisThickness={0}
           xAxisType={'dashed'}
           xAxisColor={'#ECECEC'}
@@ -279,7 +279,7 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
           initialSpacing={yearBarInitialSpacing}
           spacing={yearBarSpacing}
           barBorderRadius={5}
-          showGradient
+          // showGradient
           yAxisThickness={0}
           xAxisType={'dashed'}
           xAxisColor={'#ECECEC'}

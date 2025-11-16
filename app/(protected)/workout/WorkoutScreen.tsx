@@ -1,7 +1,8 @@
 import SlotPicker from '@/components/SlotPicker';
 import { useProfile } from '@/context/ProfileContext';
+import { useUserCapacity } from '@/context/UserCapacityContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { exercises } from '../../../constants/Exercises';
 import { muscleGroups } from '../../../constants/MuscleGroups';
@@ -20,8 +21,24 @@ interface CompletedSet {
   timestamp: string;
 }
 
+interface WorkoutLog {
+  exercise: string;
+  weight: number;
+  reps: number;
+  date: string;
+}
+
+interface ExerciseStats {
+  estimated1RM: number;
+  maxWeight: number;
+  maxReps: number;
+  totalSets: number;
+  lastWorkoutDate: string | null;
+}
+
 export default function WorkoutScreen({ exercise, weight, reps, onClose }: WorkoutScreenProps) {
   const { profile } = useProfile();
+  const { updateCapacityFromWorkout, capacityLimits } = useUserCapacity();
   
   // Find the exercise object
   const exerciseObj = exercises.find(e => e.name === exercise);
@@ -36,7 +53,71 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
   const [repsIdx, setRepsIdx] = useState(initialRepsIdx >= 0 ? initialRepsIdx : 0);
   const [logging, setLogging] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [showPRToast, setShowPRToast] = useState(false);
   const [completedSets, setCompletedSets] = useState<CompletedSet[]>([]);
+  const [exerciseStats, setExerciseStats] = useState<ExerciseStats>({
+    estimated1RM: 0,
+    maxWeight: 0,
+    maxReps: 0,
+    totalSets: 0,
+    lastWorkoutDate: null,
+  });
+
+  // Fetch exercise statistics on component mount
+  useEffect(() => {
+    fetchExerciseStats();
+  }, [exercise]);
+
+  const fetchExerciseStats = async () => {
+    try {
+      const logsStr = await AsyncStorage.getItem('workoutLogs');
+      if (!logsStr) {
+        setExerciseStats({
+          estimated1RM: capacityLimits[exercise] || 0,
+          maxWeight: 0,
+          maxReps: 0,
+          totalSets: 0,
+          lastWorkoutDate: null,
+        });
+        return;
+      }
+
+      const logs: WorkoutLog[] = JSON.parse(logsStr);
+      const exerciseLogs = logs.filter(log => log.exercise === exercise);
+
+      if (exerciseLogs.length === 0) {
+        setExerciseStats({
+          estimated1RM: capacityLimits[exercise] || 0,
+          maxWeight: 0,
+          maxReps: 0,
+          totalSets: 0,
+          lastWorkoutDate: null,
+        });
+        return;
+      }
+
+      // Calculate stats
+      let maxWeight = 0;
+      let maxReps = 0;
+      const sortedLogs = exerciseLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const lastWorkoutDate = sortedLogs[0].date;
+
+      exerciseLogs.forEach(log => {
+        if (log.weight > maxWeight) maxWeight = log.weight;
+        if (log.reps > maxReps) maxReps = log.reps;
+      });
+
+      setExerciseStats({
+        estimated1RM: capacityLimits[exercise] || 0,
+        maxWeight,
+        maxReps,
+        totalSets: exerciseLogs.length,
+        lastWorkoutDate,
+      });
+    } catch (error) {
+      console.error('Error fetching exercise stats:', error);
+    }
+  };
 
   const logExercise = async () => {
     setLogging(true);
@@ -85,18 +166,42 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       // --- Decrease muscle capacity after logging workout ---
       const prevCapacityStr = await AsyncStorage.getItem('muscleCapacity');
       let prevCapacity: Record<string, number> = prevCapacityStr ? JSON.parse(prevCapacityStr) : { ...require('../../../constants/Exercises').maxMuscleCapacity };
-      // Parse reps as number (e.g., '10 reps' -> 10)
-      const repsNum = parseInt(repsList[repsIdx]);
-      // Parse weight as number (e.g., '135 lbs' -> 135, or 'Bodyweight' remains string)
-      const weightVal = weights[weightIdx].includes('lbs') ? parseInt(weights[weightIdx]) : weights[weightIdx];
-      const drain = await calculateCapacityDrain(exercise, weightVal, repsNum);
+      
+      console.log('=== MUSCLE CAPACITY DEBUG ===');
+      console.log('Exercise:', exercise);
+      console.log('Actual Weight:', actualWeight);
+      console.log('Current Reps:', currentReps);
+      console.log('Previous Capacity:', prevCapacity);
+      
+      // Use actualWeight and currentReps that were already calculated
+      const drain = await calculateCapacityDrain(exercise, actualWeight, currentReps);
+      console.log('Calculated Drain:', drain);
+      
       muscleGroups.forEach(muscle => {
         if (drain[muscle]) {
-          prevCapacity[muscle] = Math.max(0, (prevCapacity[muscle] || 100) - drain[muscle]!);
+          const oldValue = prevCapacity[muscle] || 100;
+          const drainValue = drain[muscle]!;
+          const newValue = Math.max(0, oldValue - drainValue);
+          console.log(`${muscle}: ${oldValue} - ${drainValue} = ${newValue}`);
+          prevCapacity[muscle] = newValue;
         }
       });
+      
+      console.log('New Capacity:', prevCapacity);
       await AsyncStorage.setItem('muscleCapacity', JSON.stringify(prevCapacity));
+      console.log('=== END DEBUG ===');
       // --- End muscle capacity update ---
+
+      // --- Check for Personal Record and update 1RM estimate ---
+      const isNewPR = await updateCapacityFromWorkout(exercise, actualWeight, currentReps);
+      if (isNewPR) {
+        setShowPRToast(true);
+        setTimeout(() => setShowPRToast(false), 3000);
+      }
+      // --- End PR check ---
+
+      // Refresh stats after logging
+      await fetchExerciseStats();
 
       setLogging(false);
       setShowToast(true);
@@ -108,6 +213,20 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
     }
   };
 
+  const formatLastWorkout = (dateStr: string | null) => {
+    if (!dateStr) return 'Never';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.close} onPress={onClose}>
@@ -115,6 +234,33 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       </TouchableOpacity>
       <Text style={styles.header}>Log Workout</Text>
       <Text style={styles.exerciseName}>{exercise}</Text>
+
+      {/* Exercise Stats - Motivational Section */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Est. 1RM</Text>
+          <Text style={styles.statValue}>{exerciseStats.estimated1RM} lbs</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>PR Weight</Text>
+          <Text style={styles.statValue}>{exerciseStats.maxWeight > 0 ? `${exerciseStats.maxWeight} lbs` : '-'}</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>PR Reps</Text>
+          <Text style={styles.statValue}>{exerciseStats.maxReps > 0 ? exerciseStats.maxReps : '-'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.secondaryStatsRow}>
+        <View style={styles.secondaryStat}>
+          <Text style={styles.secondaryStatLabel}>Total Sets</Text>
+          <Text style={styles.secondaryStatValue}>{exerciseStats.totalSets}</Text>
+        </View>
+        <View style={styles.secondaryStat}>
+          <Text style={styles.secondaryStatLabel}>Last Workout</Text>
+          <Text style={styles.secondaryStatValue}>{formatLastWorkout(exerciseStats.lastWorkoutDate)}</Text>
+        </View>
+      </View>
 
       {completedSets.length > 0 && (
         <View style={styles.setsContainer}>
@@ -141,6 +287,14 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
           <Text style={styles.toastText}>Set logged!</Text>
         </View>
       )}
+
+      {showPRToast && (
+        <View style={styles.prToast}>
+          <Text style={styles.prToastText}>🎉 NEW PERSONAL RECORD! 🎉</Text>
+          <Text style={styles.prToastSubtext}>Your 1RM estimate has been updated</Text>
+        </View>
+      )}
+
       <View style={styles.flexBottomContainer}>
         <View style={styles.inlinePickersRow}>
           <View style={styles.inlinePickerCol}>
@@ -235,6 +389,36 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  prToast: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 100,
+    backgroundColor: '#10B981',
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginHorizontal: 24,
+    zIndex: 101,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  prToastText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  prToastSubtext: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 4,
+    textAlign: 'center',
+    opacity: 0.9,
+  },
   flexBottomContainer: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -294,5 +478,55 @@ const styles = StyleSheet.create({
     color: '#C2BABA',
     flex: 1,
     textAlign: 'right',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    marginBottom: 12,
+    gap: 8,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E8E8E8',
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ED2737',
+  },
+  secondaryStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  secondaryStat: {
+    alignItems: 'center',
+  },
+  secondaryStatLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#999',
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  secondaryStatValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#181C20',
   },
 });

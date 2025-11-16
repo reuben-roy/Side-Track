@@ -1,5 +1,4 @@
 import ProfileButton from '@/components/ProfileButton';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { exercises } from '../../../constants/Exercises';
@@ -64,71 +63,61 @@ export default function HomeScreen() {
   }
 
   return (
-    <LinearGradient
-      colors={['#FAFAFF', '#F0E6F6', '#E8D4F2']}
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-    >
+    <View style={styles.container}>
       <ProfileButton top={57} right={20} />
       
       {/* Header Section */}
       <View style={styles.headerContainer}>
-        <Text style={styles.header}>SideTrack</Text>
-        <Text style={styles.subHeader}>Work Out till you Pass Out</Text>
+      <Text style={styles.header}>SideTrack</Text>
+      <Text style={styles.subHeader}>Work Out till you Pass Out</Text>
       </View>
 
       {/* Title Section */}
       <View style={styles.titleContainer}>
-        <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
+      <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
       </View>
 
       {/* Slot Pickers Card */}
       <View style={styles.slotCard}>
-        <View style={styles.slotRow}>
-          <View style={styles.slotCol}>
-            <Text style={styles.slotLabel}>Exercise</Text>
-            <SlotPicker data={EXERCISES} selectedIndex={exerciseIdx} onSelect={setExerciseIdx} />
-          </View>
-          <View style={styles.slotCol}>
-            <Text style={styles.slotLabel}>Weight</Text>
-            <SlotPicker data={WEIGHTS} selectedIndex={weightIdx} onSelect={setWeightIdx} />
-          </View>
-          <View style={styles.slotCol}>
-            <Text style={styles.slotLabel}>Reps</Text>
-            <SlotPicker data={REPS} selectedIndex={repsIdx} onSelect={setRepsIdx} />
-          </View>
+      <View style={styles.slotRow}>
+        <View style={styles.slotCol}>
+        <Text style={styles.slotLabel}>Exercise</Text>
+        <SlotPicker data={EXERCISES} selectedIndex={exerciseIdx} onSelect={setExerciseIdx} />
         </View>
+        <View style={styles.slotCol}>
+        <Text style={styles.slotLabel}>Weight</Text>
+        <SlotPicker data={WEIGHTS} selectedIndex={weightIdx} onSelect={setWeightIdx} />
+        </View>
+        <View style={styles.slotCol}>
+        <Text style={styles.slotLabel}>Reps</Text>
+        <SlotPicker data={REPS} selectedIndex={repsIdx} onSelect={setRepsIdx} />
+        </View>
+      </View>
       </View>
 
       {/* Buttons */}
       <View style={styles.buttonContainer}>
+      <TouchableOpacity 
+        style={styles.pickButton} 
+        onPress={() => setShowWorkout(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.pickButtonText}>Select Exercise</Text>
+      </TouchableOpacity>
+      
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <TouchableOpacity 
-          style={styles.pickButton} 
-          onPress={() => setShowWorkout(true)}
-          activeOpacity={0.8}
+        style={styles.spinButton} 
+        onPress={spin}
+        activeOpacity={0.8}
         >
-          <Text style={styles.pickButtonText}>Select Exercise</Text>
+        <View style={[styles.spinButtonGradient, { backgroundColor: '#D1D5DB' }]}>
+          <Text style={styles.spinButtonText}>Select For Me</Text>
+        </View>
         </TouchableOpacity>
-        
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-          <TouchableOpacity 
-            style={styles.spinButton} 
-            onPress={spin}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#E6B3B3', '#D89898']}
-              style={styles.spinButtonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Text style={styles.spinButtonText}>Select For Me</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
+      </Animated.View>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -233,7 +222,7 @@ function SlotPicker({
         <View
           style={{
             height: ITEM_HEIGHT,
-            width: '90%',
+            width: '100%',
             borderRadius: 12,
             borderWidth: 2,
             borderColor: '#E6B3B3',
