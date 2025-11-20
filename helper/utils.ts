@@ -2,34 +2,35 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { exercises, maxMuscleCapacity, recoveryRatePerHour } from '../constants/Exercises';
 import { MuscleGroup } from '../constants/MuscleGroups';
 
-// --- One-Rep Max (1RM) Estimation ---
+// --- Types ---
 type Weight = number | string;
-
 type Exercise = typeof exercises[number];
-
 type UserEstimated1RMs = {
     [key: string]: number;
 };
-
 type MuscleCapacity = {
     [key in MuscleGroup]?: number;
 };
 
-function estimate1RM(
-    exerciseName: string,
-    weight: Weight,
-    reps: number
-): number {
-    // Using Epley formula: 1RM = Weight * (1 + Reps / 30)
-    if (typeof weight === 'string' && weight.includes('Bodyweight')) {
-        const baseBodyweight = 150;
-        const addedWeightMatch = weight.match(/\+(\d+)/);
-        const actualWeight = addedWeightMatch ? baseBodyweight + parseInt(addedWeightMatch[1]) : baseBodyweight;
-        return actualWeight * (1 + reps / 30);
-    }
-    return (typeof weight === 'number' ? weight : 0) * (1 + reps / 30);
+// --- Tunable Fatigue Parameters (can be customized via AsyncStorage) ---
+export const defaultFatigueParams = {
+    C0: 0.05,        // Base fatigue magnitude
+    p: 2.0,          // Sensitivity to %1RM (exponential scaling)
+    q: 1.0,          // Sensitivity to reps
+    metMultiplier: 0.15, // MET value contribution
+};
+
+// --- Muscle Key Normalization (for handling synonyms) ---
+const MUSCLE_SYNONYMS: { [key: string]: string } = {
+    rearDeltoids: 'posteriorDeltoids',
+    posteriorDeltoids: 'posteriorDeltoids',
+};
+
+function normalizeMuscleKey(key: string): string {
+    return MUSCLE_SYNONYMS[key] || key;
 }
 
+// --- Fallback 1RM values for exercises (used when user hasn't set custom values) ---
 const userEstimated1RMs: UserEstimated1RMs = {
     'Deadlift': 185,
     'Squat': 205,
@@ -60,14 +61,12 @@ const userEstimated1RMs: UserEstimated1RMs = {
     'Rope Triceps Pushdown': 85,
 };
 
-// Get user-specific capacity limit (1RM) for an exercise
+// --- Get user-specific 1RM for an exercise ---
 async function getUserCapacityLimit(exerciseName: string): Promise<number> {
     try {
-        // Search for any user's capacity limits (there should only be one logged-in user)
         const allKeys = await AsyncStorage.getAllKeys();
         const capacityKeys = allKeys.filter(key => key.startsWith('userCapacityLimits_'));
         
-        // Get the first (and should be only) user's capacity limits
         if (capacityKeys.length > 0) {
             const limitsStr = await AsyncStorage.getItem(capacityKeys[0]);
             if (limitsStr) {
@@ -81,79 +80,150 @@ async function getUserCapacityLimit(exerciseName: string): Promise<number> {
         console.error('Error loading user capacity limit:', error);
     }
     
-    // Fall back to default hardcoded value
+    // Fallback: use default hardcoded value
     return userEstimated1RMs[exerciseName] ?? 100;
 }
 
-// Get drain settings from AsyncStorage or use defaults
-async function getDrainSettings() {
+// --- Get muscle-specific 1RM from AsyncStorage ---
+async function getMuscle1RM(muscleKey: string): Promise<number> {
     try {
-        const storedSettings = await AsyncStorage.getItem('drainSettings');
-        if (storedSettings) {
-            return JSON.parse(storedSettings);
+        const muscle1RMsStr = await AsyncStorage.getItem('muscle1RMs');
+        if (muscle1RMsStr) {
+            const muscle1RMs = JSON.parse(muscle1RMsStr);
+            if (muscle1RMs[muscleKey] !== undefined) {
+                return muscle1RMs[muscleKey];
+            }
         }
     } catch (error) {
-        console.error('Error loading drain settings:', error);
+        console.error('Error loading muscle 1RM:', error);
     }
-    // Default values - increased for more significant drain
-    return {
-        overallMultiplier: 12.0,
-        metCoefficient: 0.15,
-        repsCoefficient: 0.08,
-        intensityCoefficient: 0.7,
-        userBodyweight: 150,
-    };
+    return 0; // Will trigger fallback in calculation
 }
 
+// --- Estimate muscle 1RM from exercise set using Epley formula ---
+function estimateMuscle1RMFromSet(
+    exerciseName: string,
+    weight: number,
+    reps: number,
+    muscleKey: string
+): number {
+    const exercise = exercises.find((ex: Exercise) => ex.name === exerciseName);
+    if (!exercise) return weight;
+
+    // Estimate exercise 1RM using Epley: 1RM = Weight * (1 + Reps / 30)
+    const exercise1RM = weight * (1 + reps / 30);
+    
+    // Find muscle involvement (handle normalized keys)
+    let involvement = 0;
+    for (const rawMuscle of Object.keys(exercise.muscles)) {
+        if (normalizeMuscleKey(rawMuscle) === muscleKey) {
+            involvement = exercise.muscles[rawMuscle as keyof typeof exercise.muscles] as number;
+            break;
+        }
+    }
+    
+    // Scale exercise 1RM by muscle involvement
+    return exercise1RM * (involvement || 0.5);
+}
+
+// --- Get fatigue parameters (customizable via AsyncStorage) ---
+async function getFatigueParams() {
+    try {
+        const storedParams = await AsyncStorage.getItem('fatigueParams');
+        if (storedParams) {
+            return { ...defaultFatigueParams, ...JSON.parse(storedParams) };
+        }
+    } catch (error) {
+        console.error('Error loading fatigue params:', error);
+    }
+    return defaultFatigueParams;
+}
+
+// --- Get user bodyweight ---
+async function getUserBodyweight(): Promise<number> {
+    try {
+        const settings = await AsyncStorage.getItem('drainSettings');
+        if (settings) {
+            const parsed = JSON.parse(settings);
+            return parsed.userBodyweight || 150;
+        }
+    } catch (error) {
+        console.error('Error loading bodyweight:', error);
+    }
+    return 150;
+}
+
+// --- Convert weight string to number ---
+async function parseWeight(weight: Weight): Promise<number> {
+    if (typeof weight === 'number') return weight;
+    
+    if (weight.includes('Bodyweight')) {
+        const bodyweight = await getUserBodyweight();
+        const addedWeightMatch = weight.match(/([+-])(\d+)/);
+        if (addedWeightMatch) {
+            const modifier = addedWeightMatch[1] === '+' ? 1 : -1;
+            return bodyweight + (modifier * parseInt(addedWeightMatch[2]));
+        }
+        return bodyweight;
+    }
+    
+    return parseFloat(weight) || 0;
+}
+
+// --- IMPROVED CAPACITY DRAIN CALCULATION ---
 export async function calculateCapacityDrain(
     exerciseName: string,
     weightUsed: Weight,
     repsCompleted: number
 ): Promise<MuscleCapacity> {
-    const drainSettings = await getDrainSettings();
-    
     const exercise = exercises.find((ex: Exercise) => ex.name === exerciseName);
     if (!exercise) {
         console.error("Exercise not found:", exerciseName);
         return {};
     }
 
-    let effectiveWeightUsed: number = typeof weightUsed === 'number' ? weightUsed : 0;
-    if (typeof weightUsed === 'string' && weightUsed.includes('Bodyweight')) {
-        const baseBodyweight = drainSettings.userBodyweight; // Use custom bodyweight
-        const addedWeightMatch = weightUsed.match(/\+(\d+)/);
-        effectiveWeightUsed = addedWeightMatch ? baseBodyweight + parseInt(addedWeightMatch[1]) : baseBodyweight;
-    }
-
-    // Get user-specific 1RM instead of using hardcoded value
-    const user1RM = await getUserCapacityLimit(exerciseName);
-    const percentageOf1RM = user1RM > 0 ? effectiveWeightUsed / user1RM : 0;
-
-    let intensityFactor: number;
-    if (repsCompleted === 1 && percentageOf1RM >= 0.95) intensityFactor = 1.2;
-    else if (percentageOf1RM >= 0.9) intensityFactor = 1.0;
-    else if (percentageOf1RM >= 0.8) intensityFactor = 0.8;
-    else if (percentageOf1RM >= 0.7) intensityFactor = 0.6;
-    else if (percentageOf1RM >= 0.6) intensityFactor = 0.4;
-    else intensityFactor = 0.2;
-
-    // Use custom coefficients
-    const drainMultiplier = (exercise.met * drainSettings.metCoefficient) + 
-                           (repsCompleted * drainSettings.repsCoefficient) + 
-                           (intensityFactor * drainSettings.intensityCoefficient);
+    const params = await getFatigueParams();
+    const effectiveWeight = await parseWeight(weightUsed);
+    const exercise1RM = await getUserCapacityLimit(exerciseName);
 
     const drain: MuscleCapacity = {};
-    for (const muscle in exercise.muscles) {
-        if (Object.prototype.hasOwnProperty.call(exercise.muscles, muscle)) {
-            // Use custom overall multiplier
-            // @ts-expect-error: muscle may not be a MuscleGroup, but we want to allow it for flexibility
-            drain[muscle] = drainMultiplier * exercise.muscles[muscle] * drainSettings.overallMultiplier;
+
+    // Calculate drain for each involved muscle
+    for (const rawMuscle in exercise.muscles) {
+        if (!Object.prototype.hasOwnProperty.call(exercise.muscles, rawMuscle)) continue;
+
+        const muscleKey = normalizeMuscleKey(rawMuscle);
+        const involvement = exercise.muscles[rawMuscle as keyof typeof exercise.muscles] as number;
+
+        // Get muscle-specific 1RM (or estimate it)
+        let muscle1RM = await getMuscle1RM(muscleKey);
+        if (muscle1RM <= 0) {
+            muscle1RM = estimateMuscle1RMFromSet(exerciseName, effectiveWeight, repsCompleted, muscleKey);
         }
+
+        // Calculate relative intensity (%1RM)
+        const percentOf1RM = muscle1RM > 0 ? effectiveWeight / muscle1RM : 0;
+
+        // Compute fatigue cost using improved formula:
+        // cost = involvement * C0 * (percentOf1RM^p) * (reps^q) * metMultiplier * MET
+        const relativeIntensity = Math.pow(Math.max(0, percentOf1RM), params.p);
+        const repsComponent = Math.pow(repsCompleted, params.q);
+        const metComponent = exercise.met * params.metMultiplier;
+
+        const cost = involvement * params.C0 * relativeIntensity * repsComponent * metComponent;
+
+        // Convert cost to capacity drain (0-100 scale)
+        // Using exponential decay: drain = 100 * (1 - exp(-cost))
+        const capacityDrain = 100 * (1 - Math.exp(-cost));
+
+        // @ts-expect-error: muscle may not be a MuscleGroup, but we want to allow it for flexibility
+        drain[muscleKey] = Math.min(100, Math.max(0, capacityDrain));
     }
+
     return drain;
 }
 
-// Get recovery rate for a muscle, checking custom rates first
+// --- Get recovery rate for a muscle ---
 async function getRecoveryRate(muscle: string): Promise<number> {
     try {
         const customRatesStr = await AsyncStorage.getItem('customRecoveryRates');
@@ -169,23 +239,77 @@ async function getRecoveryRate(muscle: string): Promise<number> {
     return (recoveryRatePerHour as any)[muscle] || 2.0;
 }
 
+// --- IMPROVED RECOVERY CALCULATION ---
+// Uses exponential approach to 100% capacity for more realistic recovery
 export async function applyRecovery(
     currentCapacity: MuscleCapacity,
     hoursPassed: number
 ): Promise<MuscleCapacity> {
     const newCapacity: MuscleCapacity = { ...currentCapacity };
+    
     for (const muscle in newCapacity) {
-        if (Object.prototype.hasOwnProperty.call(newCapacity, muscle)) {
-            // Get muscle-specific recovery rate (custom or default)
-            const muscleRecoveryRate = await getRecoveryRate(muscle);
-            // @ts-expect-error: muscle may not be a MuscleGroup, but we want to allow it for flexibility
-            newCapacity[muscle] = (newCapacity[muscle] ?? 0) + muscleRecoveryRate * hoursPassed;
-            // @ts-expect-error: muscle may not be a MuscleGroup, but we want to allow it for flexibility
-            if (newCapacity[muscle] > (maxMuscleCapacity as any)[muscle]) {
-                // @ts-expect-error: muscle may not be a MuscleGroup, but we want to allow it for flexibility
-                newCapacity[muscle] = (maxMuscleCapacity as any)[muscle];
-            }
-        }
+        if (!Object.prototype.hasOwnProperty.call(newCapacity, muscle)) continue;
+
+        const rPercent = await getRecoveryRate(muscle);
+        // @ts-expect-error: muscle may not be a MuscleGroup, but we want to allow it for flexibility
+        const currentCap = newCapacity[muscle] ?? 100;
+        const maxCap = (maxMuscleCapacity as any)[muscle] || 100;
+
+        // Convert percent per hour to exponential rate
+        // cap(t+dt) = maxCap - (maxCap - cap(t)) * exp(-lambda * dt)
+        // where exp(-lambda*1hour) = (1 - r/100)  => lambda = -ln(1 - r/100)
+        const r = Math.min(rPercent / 100, 0.9999);
+        const lambda = -Math.log(Math.max(1 - r, 1e-6));
+        
+        const recovered = maxCap - (maxCap - currentCap) * Math.exp(-lambda * hoursPassed);
+        
+        // @ts-expect-error: muscle may not be a MuscleGroup, but we want to allow it for flexibility
+        newCapacity[muscle] = Math.min(maxCap, Math.max(0, recovered));
     }
+    
     return newCapacity;
+}
+
+// --- PREDICT REPS POSSIBLE ---
+// Predicts how many reps are possible at a given weight based on current muscle fatigue
+export async function predictRepsPossible(
+    exerciseName: string,
+    weight: Weight,
+    currentCapacity: MuscleCapacity
+): Promise<number> {
+    const exercise = exercises.find((ex: Exercise) => ex.name === exerciseName);
+    if (!exercise) return 0;
+
+    const effectiveWeight = await parseWeight(weight);
+    
+    // Calculate effective 1RM based on current muscle capacities
+    let numerator = 0;
+    let denominator = 0;
+
+    for (const rawMuscle in exercise.muscles) {
+        if (!Object.prototype.hasOwnProperty.call(exercise.muscles, rawMuscle)) continue;
+
+        const muscleKey = normalizeMuscleKey(rawMuscle);
+        const involvement = exercise.muscles[rawMuscle as keyof typeof exercise.muscles] as number;
+
+        let muscle1RM = await getMuscle1RM(muscleKey);
+        if (muscle1RM <= 0) {
+            muscle1RM = estimateMuscle1RMFromSet(exerciseName, effectiveWeight, 1, muscleKey);
+        }
+
+        const capacity = currentCapacity[muscleKey as MuscleGroup] ?? 100;
+        
+        // Weighted effective 1RM
+        numerator += involvement * (capacity / 100) * muscle1RM;
+        denominator += involvement;
+    }
+
+    const effectiveOneRM = denominator > 0 ? numerator / denominator : 0;
+    
+    if (effectiveOneRM <= effectiveWeight) return 0;
+
+    // Invert Epley formula: reps = 30 * (1RM / weight - 1)
+    const repsPossible = Math.floor(30 * (effectiveOneRM / effectiveWeight - 1));
+    
+    return Math.max(0, repsPossible);
 } 

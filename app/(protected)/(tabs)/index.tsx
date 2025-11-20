@@ -1,7 +1,9 @@
 import ProfileButton from '@/components/ProfileButton';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
-import { exercises } from '../../../constants/Exercises';
+import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';
+import { useUserCapacity } from '../../../context/UserCapacityContext';
 import WorkoutScreen from '../workout/WorkoutScreen';
 
 const ITEM_HEIGHT = 48;
@@ -12,6 +14,22 @@ const { width } = Dimensions.get('window');
 
 const EXERCISES = exercises.map(e => e.name);
 
+// Training goal definitions based on rep ranges
+type TrainingGoal = 'strength' | 'hypertrophy' | 'endurance';
+
+interface GoalConfig {
+  minReps: number;
+  maxReps: number;
+  minPercent: number; // % of 1RM
+  maxPercent: number; // % of 1RM
+}
+
+const TRAINING_GOALS: Record<TrainingGoal, GoalConfig> = {
+  strength: { minReps: 1, maxReps: 5, minPercent: 80, maxPercent: 100 },
+  hypertrophy: { minReps: 6, maxReps: 12, minPercent: 65, maxPercent: 80 },
+  endurance: { minReps: 15, maxReps: 30, minPercent: 40, maxPercent: 60 },
+};
+
 export default function HomeScreen() {
   const [exerciseIdx, setExerciseIdx] = useState(0);
   const [weightIdx, setWeightIdx] = useState(0);
@@ -19,6 +37,7 @@ export default function HomeScreen() {
   const [showWorkout, setShowWorkout] = useState(false);
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const { capacityLimits } = useUserCapacity();
 
   const selectedExercise = exercises[exerciseIdx];
   const WEIGHTS = selectedExercise.weights.map(w => typeof w === 'number' ? `${w} lbs` : w);
@@ -29,7 +48,7 @@ export default function HomeScreen() {
     setRepsIdx(0);
   }, [exerciseIdx]);
 
-  const spin = () => {
+  const spin = async () => {
     // Animate button press
     Animated.sequence([
       Animated.timing(scaleAnim, {
@@ -44,10 +63,86 @@ export default function HomeScreen() {
       }),
     ]).start();
 
-    const newExerciseIdx = Math.floor(Math.random() * EXERCISES.length);
+    // Get current muscle capacity from AsyncStorage
+    const prevCapacityStr = await AsyncStorage.getItem('muscleCapacity');
+    let prevCapacity: Record<string, number> = prevCapacityStr 
+      ? JSON.parse(prevCapacityStr) 
+      : { ...maxMuscleCapacity };
+
+    // Filter out exercises that use muscles below 30% capacity
+    const availableExercises = exercises.filter(exercise => {
+      // Check if any muscle used by this exercise is below 30%
+      const musclesUsed = exercise.muscles;
+      for (const muscle in musclesUsed) {
+        const muscleCapacity = prevCapacity[muscle] || 100;
+        const maxCapacity = (maxMuscleCapacity as any)[muscle] || 100;
+        const capacityPercent = (muscleCapacity / maxCapacity) * 100;
+        
+        // If any muscle is below 30%, skip this exercise
+        if (capacityPercent < 30) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // If no exercises are available (all muscles depleted), fall back to all exercises
+    const exercisesToChooseFrom = availableExercises.length > 0 ? availableExercises : exercises;
+    
+    // Randomly select an exercise from the filtered list
+    const randomExercise = exercisesToChooseFrom[Math.floor(Math.random() * exercisesToChooseFrom.length)];
+    const newExerciseIdx = exercises.findIndex(ex => ex.name === randomExercise.name);
+
+    // Randomly select a training goal
+    const goals: TrainingGoal[] = ['strength', 'hypertrophy', 'endurance'];
+    const selectedGoal = goals[Math.floor(Math.random() * goals.length)];
+    const goalConfig = TRAINING_GOALS[selectedGoal];
+
+    // Get user's 1RM for this exercise
+    const user1RM = capacityLimits[randomExercise.name] || 100;
+
+    // Select weight based on goal (as % of 1RM)
+    const targetPercentMin = goalConfig.minPercent / 100;
+    const targetPercentMax = goalConfig.maxPercent / 100;
+    const targetPercent = targetPercentMin + Math.random() * (targetPercentMax - targetPercentMin);
+    const targetWeight = user1RM * targetPercent;
+
+    // Find the closest available weight to our target
+    const availableWeights = exercises[newExerciseIdx].weights;
+    let closestWeightIdx = 0;
+    let minDiff = Infinity;
+
+    availableWeights.forEach((weight, idx) => {
+      let weightValue: number;
+      
+      if (typeof weight === 'number') {
+        weightValue = weight;
+      } else if (weight === 'Bodyweight') {
+        weightValue = 170; // Assume 170 lbs bodyweight
+      } else if (weight.includes('+')) {
+        weightValue = 170 + parseInt(weight.replace('+', ''));
+      } else if (weight.includes('-')) {
+        weightValue = 170 - parseInt(weight.replace('-', ''));
+      } else {
+        return;
+      }
+
+      const diff = Math.abs(weightValue - targetWeight);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestWeightIdx = idx;
+      }
+    });
+
+    // Select reps based on goal
+    const targetReps = goalConfig.minReps + Math.floor(Math.random() * (goalConfig.maxReps - goalConfig.minReps + 1));
+    const repsArray = exercises[newExerciseIdx].reps;
+    const closestRepsIdx = repsArray.findIndex(r => r >= targetReps);
+    const finalRepsIdx = closestRepsIdx >= 0 ? closestRepsIdx : repsArray.length - 1;
+
     setExerciseIdx(newExerciseIdx);
-    setWeightIdx(Math.floor(Math.random() * exercises[newExerciseIdx].weights.length));
-    setRepsIdx(Math.floor(Math.random() * exercises[newExerciseIdx].reps.length));
+    setWeightIdx(closestWeightIdx);
+    setRepsIdx(finalRepsIdx);
     setShowWorkout(true);
   };
 

@@ -4,7 +4,7 @@ import { useUserCapacity } from '@/context/UserCapacityContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { exercises } from '../../../constants/Exercises';
+import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';
 import { muscleGroups } from '../../../constants/MuscleGroups';
 import { calculateCapacityDrain } from '../../../helper/utils';
 
@@ -55,6 +55,9 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
   const [showToast, setShowToast] = useState(false);
   const [showPRToast, setShowPRToast] = useState(false);
   const [completedSets, setCompletedSets] = useState<CompletedSet[]>([]);
+  const [muscleCapacity, setMuscleCapacity] = useState<Record<string, number>>({});
+  const [predictedDrain, setPredictedDrain] = useState<Record<string, number>>({});
+  const [currentTab, setCurrentTab] = useState<'workout' | 'muscles'>('workout');
   const [exerciseStats, setExerciseStats] = useState<ExerciseStats>({
     estimated1RM: 0,
     maxWeight: 0,
@@ -66,7 +69,56 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
   // Fetch exercise statistics on component mount
   useEffect(() => {
     fetchExerciseStats();
+    loadMuscleCapacity();
   }, [exercise]);
+
+  // Recalculate predicted drain when weight or reps change
+  useEffect(() => {
+    updatePredictedDrain();
+  }, [weightIdx, repsIdx, muscleCapacity]);
+
+  const loadMuscleCapacity = async () => {
+    try {
+      const capacityStr = await AsyncStorage.getItem('muscleCapacity');
+      const capacity: Record<string, number> = capacityStr 
+        ? JSON.parse(capacityStr) 
+        : { ...maxMuscleCapacity };
+      setMuscleCapacity(capacity);
+    } catch (error) {
+      console.error('Error loading muscle capacity:', error);
+      setMuscleCapacity({ ...maxMuscleCapacity });
+    }
+  };
+
+  const updatePredictedDrain = async () => {
+    if (!exerciseObj) return;
+
+    const currentWeight = parseInt(weights[weightIdx].split(" ")[0], 10);
+    const currentReps = parseInt(repsList[repsIdx].split(" ")[0]);
+    const profileWeight = parseInt(profile?.weight || '0', 10);
+    const selectedWeight = weights[weightIdx];
+
+    let actualWeight: number;
+    if (selectedWeight === 'Bodyweight') {
+      actualWeight = profileWeight;
+    } else if (selectedWeight.startsWith('+')) {
+      const additionalWeight = parseInt(selectedWeight.substring(1));
+      actualWeight = profileWeight + additionalWeight;
+    } else if (selectedWeight.startsWith('-')) {
+      const additionalWeight = parseInt(selectedWeight.substring(1));
+      actualWeight = profileWeight - additionalWeight;
+    } else {
+      actualWeight = currentWeight;
+    }
+
+    try {
+      const drain = await calculateCapacityDrain(exercise, actualWeight, currentReps);
+      setPredictedDrain(drain);
+    } catch (error) {
+      console.error('Error calculating predicted drain:', error);
+      setPredictedDrain({});
+    }
+  };
 
   const fetchExerciseStats = async () => {
     try {
@@ -190,6 +242,9 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       console.log('New Capacity:', prevCapacity);
       await AsyncStorage.setItem('muscleCapacity', JSON.stringify(prevCapacity));
       console.log('=== END DEBUG ===');
+      
+      // Update local state to reflect changes immediately
+      setMuscleCapacity(prevCapacity);
       // --- End muscle capacity update ---
 
       // --- Check for Personal Record and update 1RM estimate ---
@@ -227,6 +282,51 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  const formatMuscleName = (muscle: string): string => {
+    const nameMap: Record<string, string> = {
+      'quads': 'Quads',
+      'hamstrings': 'Hamstrings',
+      'glutes': 'Glutes',
+      'calves': 'Calves',
+      'pecs': 'Chest',
+      'anteriorDeltoids': 'Front Delts',
+      'medialDeltoids': 'Side Delts',
+      'posteriorDeltoids': 'Rear Delts',
+      'rearDeltoids': 'Rear Delts',
+      'triceps': 'Triceps',
+      'biceps': 'Biceps',
+      'lats': 'Lats',
+      'upperBack': 'Upper Back',
+      'lowerBack': 'Lower Back',
+      'core': 'Core',
+      'forearms': 'Forearms',
+    };
+    return nameMap[muscle] || muscle;
+  };
+
+  const getCapacityColor = (capacity: number): string => {
+    if (capacity >= 70) return '#10B981'; // Green - fresh
+    if (capacity >= 40) return '#F59E0B'; // Orange - moderate fatigue
+    return '#EF4444'; // Red - high fatigue
+  };
+
+  const getMusclesEngaged = () => {
+    if (!exerciseObj || !exerciseObj.muscles) return [];
+    
+    return Object.entries(exerciseObj.muscles)
+      .sort(([, a], [, b]) => b - a) // Sort by involvement percentage (highest first)
+      .map(([muscle, involvement]) => ({
+        name: muscle,
+        involvement: involvement * 100,
+        currentCapacity: muscleCapacity[muscle] || 100,
+        predictedDrain: predictedDrain[muscle] || 0,
+      }));
+  };
+
+  const switchToTab = (tab: 'workout' | 'muscles') => {
+    setCurrentTab(tab);
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.close} onPress={onClose}>
@@ -235,51 +335,150 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       <Text style={styles.header}>Log Workout</Text>
       <Text style={styles.exerciseName}>{exercise}</Text>
 
-      {/* Exercise Stats - Motivational Section */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Est. 1RM</Text>
-          <Text style={styles.statValue}>{exerciseStats.estimated1RM} lbs</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>PR Weight</Text>
-          <Text style={styles.statValue}>{exerciseStats.maxWeight > 0 ? `${exerciseStats.maxWeight} lbs` : '-'}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>PR Reps</Text>
-          <Text style={styles.statValue}>{exerciseStats.maxReps > 0 ? exerciseStats.maxReps : '-'}</Text>
-        </View>
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, currentTab === 'workout' && styles.activeTab]}
+          onPress={() => switchToTab('workout')}
+        >
+          <Text style={[styles.tabText, currentTab === 'workout' && styles.activeTabText]}>
+            Log Set
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, currentTab === 'muscles' && styles.activeTab]}
+          onPress={() => switchToTab('muscles')}
+        >
+          <Text style={[styles.tabText, currentTab === 'muscles' && styles.activeTabText]}>
+            Exercise Info
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.secondaryStatsRow}>
-        <View style={styles.secondaryStat}>
-          <Text style={styles.secondaryStatLabel}>Total Sets</Text>
-          <Text style={styles.secondaryStatValue}>{exerciseStats.totalSets}</Text>
-        </View>
-        <View style={styles.secondaryStat}>
-          <Text style={styles.secondaryStatLabel}>Last Workout</Text>
-          <Text style={styles.secondaryStatValue}>{formatLastWorkout(exerciseStats.lastWorkoutDate)}</Text>
-        </View>
-      </View>
+      {/* Tab Content - Conditional Rendering */}
+      {currentTab === 'workout' ? (
+        /* Workout Tab */
+        <>
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.contentContainer}>
+            {completedSets.length > 0 && (
+              <View style={styles.setsContainer}>
+                <Text style={styles.setsTitle}>Completed Sets</Text>
+                <View style={styles.setsList}>
+                  {completedSets.map((set, index) => (
+                    <View key={index} style={styles.setItem}>
+                      <Text style={styles.setNumber}>Set {index + 1}</Text>
+                      <Text style={styles.setDetails}>
+                        {set.weight} lbs × {set.reps} reps
+                      </Text>
+                      <Text style={styles.setTime}>{set.timestamp}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </ScrollView>
 
-      {completedSets.length > 0 && (
-        <View style={styles.setsContainer}>
-          <Text style={styles.setsTitle}>Completed Sets</Text>
-            <ScrollView 
-            style={[styles.setsList, { height: 150 }]} 
-            showsVerticalScrollIndicator={false}
-            >
-            {completedSets.map((set, index) => (
-              <View key={index} style={styles.setItem}>
-              <Text style={styles.setNumber}>Set {index + 1}</Text>
-              <Text style={styles.setDetails}>
-                {set.weight} lbs × {set.reps} reps
-              </Text>
-              <Text style={styles.setTime}>{set.timestamp}</Text>
+          {/* Fixed Bottom Controls */}
+          <View style={styles.bottomControls}>
+            <View style={styles.inlinePickersRow}>
+              <View style={styles.inlinePickerCol}>
+                <Text style={styles.sectionTitle}>Weight</Text>
+                <SlotPicker
+                  data={weights}
+                  selectedIndex={weightIdx}
+                  onSelect={setWeightIdx}
+                  style={{}}
+                />
+              </View>
+              <View style={styles.inlinePickerCol}>
+                <Text style={styles.sectionTitle}>Reps</Text>
+                <SlotPicker
+                  data={repsList}
+                  selectedIndex={repsIdx}
+                  onSelect={setRepsIdx}
+                />
+              </View>
+            </View>
+            <TouchableOpacity style={styles.logButton} onPress={logExercise} disabled={logging}>
+              <Text style={styles.logButtonText}>{logging ? 'Logging...' : 'Log Set'}</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      ) : (
+        /* Exercise Info Tab */
+        <ScrollView showsVerticalScrollIndicator={false} style={styles.contentContainer}>
+          {/* Exercise Stats - Motivational Section */}
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Est. 1RM</Text>
+              <Text style={styles.statValue}>{exerciseStats.estimated1RM} lbs</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>PR Weight</Text>
+              <Text style={styles.statValue}>{exerciseStats.maxWeight > 0 ? `${exerciseStats.maxWeight} lbs` : '-'}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>PR Reps</Text>
+              <Text style={styles.statValue}>{exerciseStats.maxReps > 0 ? exerciseStats.maxReps : '-'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.secondaryStatsRow}>
+            <View style={styles.secondaryStat}>
+              <Text style={styles.secondaryStatLabel}>Total Sets</Text>
+              <Text style={styles.secondaryStatValue}>{exerciseStats.totalSets}</Text>
+            </View>
+            <View style={styles.secondaryStat}>
+              <Text style={styles.secondaryStatLabel}>Last Workout</Text>
+              <Text style={styles.secondaryStatValue}>{formatLastWorkout(exerciseStats.lastWorkoutDate)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.muscleEngagementContainer}>
+            <Text style={styles.muscleEngagementTitle}>Muscles Engaged</Text>
+            <Text style={styles.muscleEngagementSubtitle}>
+              Based on {weights[weightIdx]} × {repsList[repsIdx]}
+            </Text>
+            {getMusclesEngaged().map((muscle) => (
+              <View key={muscle.name} style={styles.muscleRow}>
+                <View style={styles.muscleInfo}>
+                  <Text style={styles.muscleName}>{formatMuscleName(muscle.name)}</Text>
+                  <Text style={styles.muscleInvolvement}>{muscle.involvement.toFixed(0)}% involvement</Text>
+                </View>
+                <View style={styles.muscleCapacityInfo}>
+                  <View style={styles.capacityBarContainer}>
+                    <View 
+                      style={[
+                        styles.capacityBar, 
+                        { 
+                          width: `${muscle.currentCapacity}%`,
+                          backgroundColor: getCapacityColor(muscle.currentCapacity)
+                        }
+                      ]} 
+                    />
+                    <View 
+                      style={[
+                        styles.drainIndicator,
+                        { 
+                          width: `${muscle.predictedDrain}%`,
+                          left: `${Math.max(0, muscle.currentCapacity - muscle.predictedDrain)}%`
+                        }
+                      ]}
+                    />
+                  </View>
+                  <View style={styles.capacityNumbers}>
+                    <Text style={[styles.capacityText, { color: getCapacityColor(muscle.currentCapacity) }]}>
+                      {muscle.currentCapacity.toFixed(0)}%
+                    </Text>
+                    {muscle.predictedDrain > 0 && (
+                      <Text style={styles.drainText}>-{muscle.predictedDrain.toFixed(1)}</Text>
+                    )}
+                  </View>
+                </View>
               </View>
             ))}
-            </ScrollView>
-        </View>
+          </View>
+        </ScrollView>
       )}
 
       {showToast && (
@@ -294,31 +493,6 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
           <Text style={styles.prToastSubtext}>Your 1RM estimate has been updated</Text>
         </View>
       )}
-
-      <View style={styles.flexBottomContainer}>
-        <View style={styles.inlinePickersRow}>
-          <View style={styles.inlinePickerCol}>
-            <Text style={styles.sectionTitle}>Weight</Text>
-            <SlotPicker
-              data={weights}
-              selectedIndex={weightIdx}
-              onSelect={setWeightIdx}
-              style={{}}
-            />
-          </View>
-          <View style={styles.inlinePickerCol}>
-            <Text style={styles.sectionTitle}>Reps</Text>
-            <SlotPicker
-              data={repsList}
-              selectedIndex={repsIdx}
-              onSelect={setRepsIdx}
-            />
-          </View>
-        </View>
-        <TouchableOpacity style={styles.logButton} onPress={logExercise} disabled={logging}>
-          <Text style={styles.logButtonText}>{logging ? 'Logging...' : 'Log Set'}</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -338,12 +512,45 @@ const styles = StyleSheet.create({
     top: 50,
     zIndex: 10,
   },
+  tabContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    marginBottom: 12,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  activeTab: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#999',
+  },
+  activeTabText: {
+    color: '#ED2737',
+  },
+  contentContainer: {
+    flex: 1,
+  },
   header: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginTop: 25,
-    marginBottom: 5,
+    marginTop: 12,
+    marginBottom: 3,
     color: '#181C20',
   },
   sectionTitle: {
@@ -423,12 +630,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  bottomControls: {
+    backgroundColor: '#fff',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
   inlinePickersRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: 16,
-    marginTop: 16,
   },
   inlinePickerCol: {
     flex: 1,
@@ -439,7 +651,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F8F8',
     borderRadius: 16,
     padding: 16,
-    maxHeight: 200,
   },
   setsTitle: {
     fontSize: 18,
@@ -528,5 +739,85 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#181C20',
+  },
+  muscleEngagementContainer: {
+    marginTop: 16,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#E8E8E8',
+  },
+  muscleEngagementTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#181C20',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  muscleEngagementSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  muscleRow: {
+    marginBottom: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+  },
+  muscleInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  muscleName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#181C20',
+  },
+  muscleInvolvement: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  muscleCapacityInfo: {
+    gap: 6,
+  },
+  capacityBarContainer: {
+    height: 8,
+    backgroundColor: '#E8E8E8',
+    borderRadius: 4,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  capacityBar: {
+    height: '100%',
+    borderRadius: 4,
+    position: 'absolute',
+    left: 0,
+  },
+  drainIndicator: {
+    height: '100%',
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+    position: 'absolute',
+    borderRightWidth: 2,
+    borderRightColor: '#EF4444',
+  },
+  capacityNumbers: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  capacityText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  drainText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EF4444',
   },
 });

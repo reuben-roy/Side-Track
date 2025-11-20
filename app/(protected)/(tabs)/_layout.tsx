@@ -24,7 +24,7 @@ export default function TabLayout() {
             backgroundColor: 'transparent',
             borderTopWidth: 0,
             elevation: 0,
-            height: hp('11%'),
+            height: hp('9%'),
             paddingTop: hp('1%'),
           },
           default: {
@@ -36,7 +36,7 @@ export default function TabLayout() {
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.1,
             shadowRadius: 8,
-            height: hp('10%'),
+            height: hp('9%'),
             paddingTop: hp('1%'),
           },
         }),
