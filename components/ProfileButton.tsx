@@ -1,5 +1,6 @@
-import { useAuth } from '@/context/AuthContext';
+// import { useAuth } from '@/context/AuthContext'; // OLD: Custom OAuth
 import { FIELDS, ProfileKeys, useProfile } from '@/context/ProfileContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext'; // NEW: Supabase Auth
 import React, { useState } from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ProfileInputField, { InputType } from './ProfileInputField';
@@ -36,9 +37,11 @@ interface ProfileButtonProps {
 }
 
 export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonProps) {
-  const auth = useAuth();
+  // const auth = useAuth(); // OLD
+  const auth = useSupabaseAuth(); // NEW
   const { profile, updateProfile } = useProfile();
-  const { user, logout } = auth || {};
+  // const { user, logout } = auth || {}; // OLD
+  const { user, signOut } = auth || {}; // NEW: signOut instead of logout
   const [modalVisible, setModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<ProfileKeys | null>(null);
 
@@ -69,18 +72,19 @@ export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonPro
 
   const handleLogout = () => {
     setModalVisible(false);
-    logout?.();
+    // logout?.(); // OLD
+    signOut?.(); // NEW
   };
 
   return (
     <>
       <TouchableOpacity style={[styles.profileButton, { top, right }]} onPress={() => setModalVisible(true)}>
-        {user?.picture ? (
-          <Image source={{ uri: user.picture }} style={styles.profileImage} />
+        {user?.user_metadata?.picture || user?.user_metadata?.avatar_url ? (
+          <Image source={{ uri: user.user_metadata.picture || user.user_metadata.avatar_url }} style={styles.profileImage} />
         ) : (
           <View style={styles.profilePlaceholder}>
             <Text style={styles.profilePlaceholderText}>
-              {user?.name?.charAt(0) || 'U'}
+              {user?.user_metadata?.name?.charAt(0) || user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0).toUpperCase() || 'U'}
             </Text>
           </View>
         )}

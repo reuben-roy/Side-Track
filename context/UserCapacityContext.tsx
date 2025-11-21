@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { useAuth } from './AuthContext';
+// import { useAuth } from './AuthContext'; // OLD: Custom OAuth
+import { useSupabaseAuth } from './SupabaseAuthContext'; // NEW: Supabase Auth
 
 /**
  * User-specific capacity limits (estimated 1RM) for each exercise.
@@ -67,7 +68,8 @@ const DEFAULT_CAPACITY_LIMITS: UserCapacityLimits = {
 export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ children }) => {
   const [capacityLimits, setCapacityLimits] = useState<UserCapacityLimits>(DEFAULT_CAPACITY_LIMITS);
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuth();
+  // const { user } = useAuth(); // OLD
+  const { user } = useSupabaseAuth(); // NEW
 
   // Load capacity limits when component mounts or user changes
   useEffect(() => {
@@ -80,7 +82,8 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
       console.warn('No user logged in');
       return 'userCapacityLimits_default';
     }
-    return `userCapacityLimits_${user.sub}`;
+    // return `userCapacityLimits_${user.sub}`; // OLD: Custom OAuth used 'sub'
+    return `userCapacityLimits_${user.id}`; // NEW: Supabase uses 'id'
   };
 
   const loadCapacityLimits = async () => {

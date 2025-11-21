@@ -13,7 +13,8 @@
       "bundleIdentifier": "fun.explosion.sidetrack",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": ["https", "http"]
       }
     },
     "android": {

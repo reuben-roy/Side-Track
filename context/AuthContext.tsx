@@ -1,5 +1,6 @@
 import { BASE_URL, GOOGLE_CLIENT_SECRET } from '@/constants/GlobalConstants';
 import { tokenCache } from '@/helper/cache';
+import { supabase } from '@/lib/supabase';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { AuthError, AuthRequestConfig, DiscoveryDocument, exchangeCodeAsync, makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 import { randomUUID } from 'expo-crypto';
@@ -182,32 +183,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accessToken: string;
     refreshToken: string;
   }) => {
-    const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
-      tokens;
+    try {
+      const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+        tokens;
 
-    console.log(
-      "Received initial access token:",
-      newAccessToken ? "exists" : "missing"
-    );
-    console.log(
-      "Received initial refresh token:",
-      newRefreshToken ? "exists" : "missing"
-    );
+      console.log(
+        "Received initial access token:",
+        newAccessToken ? "exists" : "missing"
+      );
+      console.log(
+        "Received initial refresh token:",
+        newRefreshToken ? "exists" : "missing"
+      );
 
-    // Store tokens in state
-    if (newAccessToken) setAccessToken(newAccessToken);
-    if (newRefreshToken) setRefreshToken(newRefreshToken);
+      // Store tokens in state
+      if (newAccessToken) setAccessToken(newAccessToken);
+      if (newRefreshToken) setRefreshToken(newRefreshToken);
 
-    // Save tokens to secure storage for persistence
-    if (newAccessToken)
-      await tokenCache?.saveToken("accessToken", newAccessToken);
-    if (newRefreshToken)
-      await tokenCache?.saveToken("refreshToken", newRefreshToken);
+      // Save tokens to secure storage for persistence
+      if (newAccessToken) {
+        console.log("Saving access token to secure storage...");
+        await tokenCache?.saveToken("accessToken", newAccessToken);
+      }
+      if (newRefreshToken) {
+        console.log("Saving refresh token to secure storage...");
+        await tokenCache?.saveToken("refreshToken", newRefreshToken);
+      }
 
-    // Decode the JWT access token to get user information
-    if (newAccessToken) {
-      const decoded = jose.decodeJwt(newAccessToken);
-      setUser(decoded as AuthUser);
+      // Decode the JWT access token to get user information
+      if (newAccessToken) {
+        console.log("Decoding JWT token...");
+        const decoded = jose.decodeJwt(newAccessToken);
+        console.log("Setting user data...");
+        setUser(decoded as AuthUser);
+        
+        // Save user to Supabase database
+        try {
+          console.log("Saving user to database...");
+          const { error } = await supabase
+            .from('users')
+            .upsert({
+              id: (decoded as any).sub,
+              email: (decoded as any).email || '',
+              name: (decoded as any).name || null,
+              picture: (decoded as any).picture || null,
+              provider: (decoded as any).provider || 'apple',
+              last_login: new Date().toISOString(),
+            }, {
+              onConflict: 'id'
+            });
+          
+          if (error) {
+            console.error("Error saving user to database:", error);
+          } else {
+            console.log("User saved to database successfully");
+          }
+        } catch (dbError) {
+          console.error("Database error:", dbError);
+          // Don't throw - we still want to let the user in even if DB save fails
+        }
+        
+        console.log("User data set successfully");
+      }
+    } catch (error) {
+      console.error("Error handling native tokens:", error);
+      throw error;
     }
   };
 
@@ -301,18 +341,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!request) {
         console.log("No request");
+        alert("Google Sign-In is not available. Please try again.");
         return;
       }
 
+      setLoading(true);
+      
       // Use specific options for web to handle COOP issues
       if (isWeb) {
         await promptAsync({ windowFeatures: { popup: true } });
       } else {
-        await promptAsync();
+        // For native, use the default browser flow
+        const result = await promptAsync();
+        console.log("Google auth result:", result.type);
       }
     } catch (e) {
       console.error("Login error:", e);
       alert(`Login failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      setLoading(false);
     }
   };
 
@@ -364,7 +410,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithApple = async () => { 
     try {
+      setLoading(true);
+      
+      // Check if BASE_URL is configured
+      if (!BASE_URL) {
+        throw new Error("Backend URL is not configured. Please contact support.");
+      }
+      
+      console.log("🍎 Starting Apple Sign In...");
+      console.log("🍎 Backend URL:", BASE_URL);
+      
       const rawNonce = randomUUID();
+      console.log("🍎 Generated nonce");
+      
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -373,18 +431,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         nonce: rawNonce,
       });
 
-      // console.log("🍎 credential", JSON.stringify(credential, null, 2));
+      console.log("🍎 Got credential from Apple");
 
       if (credential.fullName?.givenName && credential.email) {
-        // This is the first sign in
-        // This is our only chance to get the user's name and email
-        // We need to store this info in our database
-        // You can handle this on the server side as well, just keep in mind that
-        // Apple only provides name and email on the first sign in
-        // On subsequent sign ins, these fields will be null
-        console.log("🍎 first sign in");
+        console.log("🍎 First sign in with name and email");
       }
 
+      console.log("🍎 Calling backend API...");
       // Send both the identity token and authorization code to server
       const appleResponse = await fetch(
         `${BASE_URL}/api/auth/apple/apple-native`,
@@ -409,7 +462,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       );
 
+      console.log("🍎 API response status:", appleResponse.status);
       const responseText = await appleResponse.text();
+      console.log("🍎 API response text:", responseText.substring(0, 200));
       
       if (!appleResponse.ok) {
         console.error("🍎 Apple auth failed:", appleResponse.status, responseText);
@@ -417,13 +472,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       const tokens = JSON.parse(responseText);
+      console.log("🍎 Got tokens, storing...");
       await handleNativeTokens(tokens);
       
+      console.log("🍎 Tokens stored, navigating...");
       // Navigate to the protected route after successful authentication
       router.replace('/(protected)/(tabs)');
+      console.log("🍎 Navigation complete");
     } catch (e) {
-      console.log(e);
-      // handleAppleAuthError(e);
+      console.error("🍎 Apple Sign In Error:", e);
+      if (e instanceof Error) {
+        alert(`Apple Sign In failed: ${e.message}`);
+      } else {
+        alert("Apple Sign In failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 

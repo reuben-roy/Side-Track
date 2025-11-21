@@ -1,5 +1,6 @@
-import { AuthProvider } from "@/context/AuthContext";
+// import { AuthProvider } from "@/context/AuthContext"; // OLD: Custom OAuth
 import { ProfileProvider } from "@/context/ProfileContext";
+import { SupabaseAuthProvider } from "@/context/SupabaseAuthContext"; // NEW: Supabase Auth
 import { UserCapacityProvider } from "@/context/UserCapacityContext";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -7,7 +8,8 @@ import React from "react";
 
 export default function RootLayout() {
     return (
-        <AuthProvider>
+        <SupabaseAuthProvider>
+            {/* <AuthProvider> */}
             <ProfileProvider>
                 <UserCapacityProvider>
                     <StatusBar style="auto" />
@@ -34,6 +36,7 @@ export default function RootLayout() {
                     </Stack>
                 </UserCapacityProvider>
             </ProfileProvider>
-        </AuthProvider>
+            {/* </AuthProvider> */}
+        </SupabaseAuthProvider>
     )
 }

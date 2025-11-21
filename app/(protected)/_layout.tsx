@@ -1,11 +1,13 @@
-import { useAuth } from '@/context/AuthContext';
+// import { useAuth } from '@/context/AuthContext'; // OLD: Custom OAuth
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext'; // NEW: Supabase Auth
 import { Redirect, Slot } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 // import 'react-native-reanimated';
 
 export default function ProtectedLayout() {
-  const authContext = useAuth()
+  // const authContext = useAuth() // OLD
+  const authContext = useSupabaseAuth(); // NEW
 
   if (authContext?.loading) {
     return (

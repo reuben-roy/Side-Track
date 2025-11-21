@@ -1,13 +1,15 @@
-import { useAuth } from '@/context/AuthContext';
+// import { useAuth } from '@/context/AuthContext'; // OLD: Custom OAuth
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext'; // NEW: Supabase Auth
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import React from 'react';
-import { Dimensions, Image, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
 const LoginScreen = () => {
-  const authContext = useAuth();
+  // const authContext = useAuth(); // OLD
+  const authContext = useSupabaseAuth(); // NEW
   
   return (
     <SafeAreaView style={styles.container}>
@@ -19,21 +21,33 @@ const LoginScreen = () => {
           <Text style={styles.subtitle}>To bring out the best in you</Text>
         </View>
         
-        <TouchableOpacity style={styles.socialButton} onPress={authContext?.loginWithGoogle}>
+        {/* Google Sign In */}
+        <TouchableOpacity style={styles.socialButton} onPress={authContext?.signInWithGoogle} disabled={authContext?.loading}>
           <Ionicons name="logo-google" size={24} color="#fff" />
-          <Text style={styles.socialButtonText}>Login with Google</Text>
+          {authContext?.loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.socialButtonText}>Login with Google</Text>
+          )}
         </TouchableOpacity>
+        {authContext?.error ? <Text style={styles.errorText}>{authContext.error}</Text> : null}
 
         {Platform.OS === 'ios' ? (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-            cornerRadius={24}
-            style={styles.appleButton}
-            onPress={authContext?.signInWithApple}
-          />
+          authContext?.loading ? (
+            <View style={[styles.appleButton, { justifyContent: 'center', alignItems: 'center' }]}>
+              <ActivityIndicator />
+            </View>
+          ) : (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+              cornerRadius={24}
+              style={styles.appleButton}
+              onPress={authContext?.signInWithApple}
+            />
+          )
         ) : Platform.OS === 'web' ? (
-          <TouchableOpacity style={styles.socialButton} onPress={authContext?.signInWithAppleWebBrowser}>
+          <TouchableOpacity style={styles.socialButton} onPress={authContext?.signInWithApple}>
             <Ionicons name="logo-apple" size={24} color="#fff" />
             <Text style={styles.socialButtonText}>Sign in with Apple</Text>
           </TouchableOpacity>
@@ -113,6 +127,12 @@ const styles = StyleSheet.create({
   },
   subtitleContainer: {
     marginBottom: 32
+  }
+  ,
+  errorText: {
+    color: '#FF5A5F',
+    textAlign: 'center',
+    marginTop: 8,
   }
 });
 
