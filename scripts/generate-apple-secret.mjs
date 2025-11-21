@@ -8,17 +8,21 @@
  * 4. Client ID (Service ID you created, e.g., fun.explosion.sidetrack.web)
  */
 
+// Run 'node scripts/generate-apple-secret.mjs' to create the JWT secret
+// Make sure to rotate keys evey 6 months as Apple requires
+// UPDATE THE VALUES BELOW BEFORE RUNNING
+
 import fs from 'fs';
 import * as jose from 'jose';
 
 async function generateAppleSecret() {
   // UPDATE THESE VALUES:
-  const keyId = 'M769K934RF'; // From your filename
+  const keyId = '7LGL5Y8UB8'; // From your filename
   const teamId = '5L6RA824YS';
   const clientId = 'fun.explosion.sidetrack.web'; // Your Service ID
   
   // Path to your .p8 file
-  const privateKeyPath = '/Users/reuben.secondary/Library/Group Containers/group.com.apple.notes/Accounts/1DAF7921-F4A0-4360-B61B-C69C4A9694BD/Media/14F5BB54-AEE7-431B-B051-3F9F2D256A4B/1_94734E8F-A5AC-49A5-B2AF-3663F8D0BCFB/AuthKey_M769K934RF.p8';
+  const privateKeyPath = '/Users/reuben.secondary/Downloads/AuthKey_7LGL5Y8UB8.p8';
   
   try {
     // Read the private key
