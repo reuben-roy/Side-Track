@@ -152,8 +152,8 @@ function calculateYearlyCalories(workoutLogs: WorkoutLog[], profile: Profile) {
   return months.map((month: string) => ({
     value: caloriesPerMonth[month] || 0,
     label: month,
-    frontColor: '#ED2737',
-    gradientColor: '#F5F2F2',
+    frontColor: '#000000',
+    gradientColor: '#F2F2F7',
   }));
 }
 
@@ -175,10 +175,10 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
 
   function getPeriodButtonStyle(paddingHorizontal: number) {
     return {
-      paddingVertical: 6,
+      paddingVertical: 8,
       paddingHorizontal,
-      borderRadius: 10,
-      backgroundColor: '#ECECEC',
+      borderRadius: 12,
+      backgroundColor: '#F2F2F7',
       marginHorizontal: 2,
     };
   }
@@ -189,8 +189,8 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
   const barData = weekOrder.map(day => ({
     value: weeklyCalories[day] || 0,
     label: day,
-    frontColor: '#ED2737',
-    gradientColor: '#F5F2F2',
+    frontColor: '#000000',
+    gradientColor: '#F2F2F7',
   }));
 
   const { caloriesPerDay, monthDays, maxCals } = calculateMonthlyCalories(workoutLogs, profile);
@@ -228,11 +228,11 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
           // showGradient
           yAxisThickness={0}
           xAxisType={'dashed'}
-          xAxisColor={'#ECECEC'}
-          yAxisTextStyle={{ color: '#C2BABA' }}
+          xAxisColor={'#E5E5EA'}
+          yAxisTextStyle={{ color: '#8E8E93' }}
           maxValue={Math.max(...barData.map(b => b.value), 100)}
           noOfSections={4}
-          xAxisLabelTextStyle={{ color: '#C2BABA', textAlign: 'center', fontWeight: 'bold' }}
+          xAxisLabelTextStyle={{ color: '#8E8E93', textAlign: 'center', fontWeight: 'bold' }}
           height={180}
           disableScroll
         />
@@ -261,7 +261,7 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
               const r = cals === 0 ? minR : minR + ((maxR - minR) * cals) / maxCals;
               return (
                 <View key={key} style={styles.calendarDayCell}>
-                  <View style={[styles.calendarCircle, { width: r * 2, height: r * 2, borderRadius: r, backgroundColor: cals > 0 ? '#ED2737' : '#ECECEC' }]}/>
+                  <View style={[styles.calendarCircle, { width: r * 2, height: r * 2, borderRadius: r, backgroundColor: cals > 0 ? '#000000' : '#E5E5EA' }]}/>
                   <Text style={styles.calendarDayText}>{date.getDate()}</Text>
                   {cals > 0 && <Text style={styles.calendarCalsText}>{cals}</Text>}
                 </View>
@@ -282,11 +282,11 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
           // showGradient
           yAxisThickness={0}
           xAxisType={'dashed'}
-          xAxisColor={'#ECECEC'}
-          yAxisTextStyle={{ color: '#C2BABA' }}
+          xAxisColor={'#E5E5EA'}
+          yAxisTextStyle={{ color: '#8E8E93' }}
           maxValue={Math.max(...yearBarData.map((b: any) => b.value), 100)}
           noOfSections={4}
-          xAxisLabelTextStyle={{ color: '#C2BABA', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}
+          xAxisLabelTextStyle={{ color: '#8E8E93', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}
           height={180}
           disableScroll
         />
@@ -297,41 +297,37 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
 
 const styles = StyleSheet.create({
   chartSection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
     paddingVertical: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#181C20',
-    marginBottom: 20,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 24,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   periodSelectorRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
     gap: 8,
   },
   periodButtonSelected: {
-    backgroundColor: '#ED2737',
-    shadowColor: '#ED2737',
+    backgroundColor: '#000000',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   periodButtonText: {
-    color: '#666',
+    color: '#8E8E93',
     fontWeight: '600',
     fontSize: 15,
   },
@@ -346,17 +342,18 @@ const styles = StyleSheet.create({
   calendarHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: '#F0F0F0',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
   },
   calendarHeaderText: {
     flex: 1,
     textAlign: 'center',
-    fontWeight: 'bold',
-    color: '#666',
-    fontSize: 14,
+    fontWeight: '700',
+    color: '#8E8E93',
+    fontSize: 13,
+    textTransform: 'uppercase',
   },
   calendarDaysGrid: {
     flexDirection: 'row',
@@ -371,17 +368,17 @@ const styles = StyleSheet.create({
   calendarCircle: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   calendarDayText: {
     fontSize: 13,
-    color: '#181C20',
+    color: '#000000',
     fontWeight: '600',
   },
   calendarCalsText: {
     fontSize: 10,
-    color: '#ED2737',
-    fontWeight: 'bold',
+    color: '#000000',
+    fontWeight: '700',
     marginTop: 2,
   },
 });

@@ -206,7 +206,7 @@ export default function HomeScreen() {
         onPress={spin}
         activeOpacity={0.8}
         >
-        <View style={[styles.spinButtonGradient, { backgroundColor: '#D1D5DB' }]}>
+        <View style={styles.spinButtonGradient}>
           <Text style={styles.spinButtonText}>Select For Me</Text>
         </View>
         </TouchableOpacity>
@@ -253,6 +253,26 @@ function SlotPicker({
 
   return (
     <View style={[{ height: ITEM_TOTAL_HEIGHT * VISIBLE_ITEMS, position: 'relative' }, style]}>
+      {/* Center highlight overlay */}
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
+        ]}
+      >
+        <View
+          style={{
+            height: ITEM_HEIGHT,
+            width: '100%',
+            borderRadius: 12,
+            backgroundColor: '#F2F2F7',
+          }}
+        />
+      </View>
       <Animated.FlatList
         ref={flatListRef}
         data={data}
@@ -303,35 +323,6 @@ function SlotPicker({
           );
         }}
       />
-      {/* Center highlight overlay */}
-      <View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            justifyContent: 'center',
-            alignItems: 'center',
-          },
-        ]}
-      >
-        <View
-          style={{
-            height: ITEM_HEIGHT,
-            width: '100%',
-            borderRadius: 12,
-            borderWidth: 2,
-            borderColor: '#E6B3B3',
-            backgroundColor: 'rgba(230, 179, 179, 0.15)',
-            shadowColor: '#E6B3B3',
-            shadowOffset: {
-              width: 0,
-              height: 2,
-            },
-            shadowOpacity: 0.25,
-            shadowRadius: 4,
-          }}
-        />
-      </View>
     </View>
   );
 }
@@ -339,71 +330,63 @@ function SlotPicker({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 32,
+    paddingTop: 60,
+    backgroundColor: '#FFFFFF',
   },
   headerContainer: {
-    marginTop: 25,
-    marginBottom: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    marginBottom: 24,
   },
   header: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#181C20',
-    marginBottom: 4,
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subHeader: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    letterSpacing: 0.5,
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#8E8E93',
+    letterSpacing: 0.3,
   },
   titleContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
+    paddingHorizontal: 24,
+    marginBottom: 32,
   },
   title: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#181C20',
+    color: '#000000',
     textAlign: 'center',
+    opacity: 0.7,
   },
   slotCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 24,
-    marginHorizontal: 16,
-    marginBottom: 24,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    marginHorizontal: 24,
+    marginBottom: 40,
   },
   slotRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     width: '100%',
+    gap: 12,
   },
   slotCol: {
     flex: 1,
     alignItems: 'center',
-    marginHorizontal: 4,
-    backgroundColor: '#F8F5F5',
-    borderRadius: 20,
-    overflow: 'hidden',
-    paddingTop: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 16,
+    paddingVertical: 12,
   },
   slotLabel: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 4,
+    fontWeight: '700',
+    color: '#8E8E93',
+    marginBottom: 16,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
+    textAlign: 'center',
   },
   slotItem: {
     height: ITEM_HEIGHT,
@@ -411,57 +394,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   slotText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#181C20',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
     textAlign: 'center',
   },
   buttonContainer: {
-    paddingHorizontal: 20,
-    gap: 12,
+    paddingHorizontal: 24,
+    gap: 16,
   },
   spinButton: {
-    borderRadius: 40,
-    overflow: 'hidden',
-    shadowColor: '#E6B3B3',
+    borderRadius: 20,
+    backgroundColor: '#000000',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
   },
   spinButtonGradient: {
-    paddingVertical: 18,
+    paddingVertical: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   spinButtonText: {
-    color: '#181C20',
-    fontSize: 20,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'center',
   },
   pickButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 40,
-    paddingVertical: 18,
-    borderWidth: 2,
-    borderColor: '#E6B3B3',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 20,
+    paddingVertical: 20,
+    alignItems: 'center',
   },
   pickButtonText: {
-    color: '#181C20',
-    fontSize: 20,
-    fontWeight: 'bold',
+    color: '#000000',
+    fontSize: 18,
+    fontWeight: '600',
     textAlign: 'center',
   },
 });

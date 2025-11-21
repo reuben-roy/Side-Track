@@ -43,6 +43,25 @@ export default function SlotPicker({
 
   return (
     <View style={[styles.slotContainer, { height: ITEM_TOTAL_HEIGHT * VISIBLE_ITEMS }, style]}>
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
+        ]}
+      >
+        <View
+          style={{
+            height: ITEM_HEIGHT,
+            width: '100%',
+            borderRadius: 8,
+            backgroundColor: '#F2F2F7',
+          }}
+        />
+      </View>
       <Animated.FlatList
         ref={flatListRef}
         data={data}
@@ -92,27 +111,6 @@ export default function SlotPicker({
           );
         }}
       />
-      <View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            justifyContent: 'center',
-            alignItems: 'center',
-          },
-        ]}
-      >
-        <View
-          style={{
-            height: ITEM_HEIGHT,
-            width: '100%',
-            borderRadius: 8,
-            borderWidth: 2,
-            borderColor: '#E6B3B3',
-            backgroundColor: 'rgba(255,255,255,0.2)',
-          }}
-        />
-      </View>
     </View>
   );
 }
@@ -120,10 +118,7 @@ export default function SlotPicker({
 const styles = StyleSheet.create({
   slotContainer: {
     position: 'relative',
-    backgroundColor: '#F5F2F2',
-    borderRadius: 32,
-    overflow: 'hidden',
-    width: '90%',
+    width: '100%',
     alignSelf: 'center',
   },
   slotItem: {
@@ -132,9 +127,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   slotText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#181C20',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
     textAlign: 'center',
   },
 }); 

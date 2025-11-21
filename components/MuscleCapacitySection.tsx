@@ -39,13 +39,7 @@ function interpolateColor(color1: string, color2: string, factor: number): strin
 
 // Get bar color: red (0%) -> yellow (50%) -> green (100%)
 function getBarColor(percent: number): string {
-  if (percent <= 0.5) {
-    // Red to yellow
-    return interpolateColor('#F44336', '#FFC107', percent / 0.5);
-  } else {
-    // Yellow to green
-    return interpolateColor('#FFC107', '#4CAF50', (percent - 0.5) / 0.5);
-  }
+  return '#000000';
 }
 
 export default function MuscleCapacitySection() {
@@ -125,8 +119,8 @@ export default function MuscleCapacitySection() {
             const capacity = muscleCapacity[muscle];
             const max = maxMuscleCapacity[muscle];
             const percent = Math.max(0, Math.min(1, capacity / max));
-            const barColor = getBarColor(percent);
-            const boxColor = getBarColor(percent);
+            const barColor = '#000000';
+            const boxColor = '#F2F2F7';
             return (
               <View key={muscle} style={[styles.muscleBarContainerHalf, { backgroundColor: boxColor }]}>
                 <View style={styles.muscleBoxContent}>
@@ -134,7 +128,7 @@ export default function MuscleCapacitySection() {
                   <View style={styles.muscleProgressBarBg}>
                     <View style={[styles.muscleProgressBarFill, { width: `${percent * 100}%`, backgroundColor: barColor }]} />
                     <View style={styles.musclePercentContainer} pointerEvents="none">
-                      <Text style={styles.musclePercent}>{Math.round(capacity)}%</Text>
+                      <Text style={[styles.musclePercent, { color: percent > 0.5 ? '#FFFFFF' : '#000000' }]}>{Math.round(capacity)}%</Text>
                     </View>
                   </View>
                 </View>
@@ -150,20 +144,16 @@ export default function MuscleCapacitySection() {
 
 const styles = StyleSheet.create({
   muscleSection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 20,
+    padding: 0,
     marginBottom: 20,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
   },
   muscleTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    paddingHorizontal: 10,
     gap: 8,
   },
   muscleIcon: {
@@ -171,53 +161,49 @@ const styles = StyleSheet.create({
   },
   muscleHeader: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#181C20',
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: -0.5,
   },
   info: {
     fontSize: 12,
     textAlign: 'center',
-    color: '#666',
+    color: '#8E8E93',
     fontStyle: 'italic',
-    marginTop: 8,
+    padding: 10,
   },
   muscleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
-    gap: 12,
+    paddingHorizontal: 10,
+    gap: 10,
   },
   muscleBarContainerHalf: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
   },
   muscleBoxContent: {
     padding: 10,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: '#F2F2F7',
   },
   muscleName: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 6,
-    color: '#444',
+    marginBottom: 12,
+    color: '#000000',
     textTransform: 'capitalize',
   },
   musclePercent: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#222',
+    fontSize: 12,
+    fontWeight: '800',
   },
   muscleProgressBarBg: {
     width: '100%',
-    height: 18,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 9,
+    height: 24,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 12,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
@@ -228,7 +214,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    borderRadius: 9,
+    borderRadius: 12,
   },
   musclePercentContainer: {
     position: 'absolute',

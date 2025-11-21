@@ -189,7 +189,7 @@ export default function StatsScreen() {
       style={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      <ProfileButton top={25} right={0} />
+      <ProfileButton top={57} right={20} />
       
       {/* Header */}
       <View style={styles.headerContainer}>
@@ -215,7 +215,7 @@ export default function StatsScreen() {
           </View>
           <View style={styles.progressBarBgSmall}>
             <View
-            style={[styles.progressBar, { width: `${Math.min(goalProgress.week, 100)}%`, backgroundColor: '#1E90FF' }]}
+            style={[styles.progressBar, { width: `${Math.min(goalProgress.week, 100)}%`, backgroundColor: '#000000' }]}
             />
           </View>
           <Text style={styles.goalValue}>{goalProgress.week}%</Text>
@@ -228,7 +228,7 @@ export default function StatsScreen() {
           </View>
           <View style={styles.progressBarBgSmall}>
             <View
-            style={[styles.progressBar, { width: `${Math.min(goalProgress.month, 100)}%`, backgroundColor: '#1E90FF' }]}
+            style={[styles.progressBar, { width: `${Math.min(goalProgress.month, 100)}%`, backgroundColor: '#000000' }]}
             />
           </View>
           <Text style={styles.goalValue}>{goalProgress.month}%</Text>
@@ -299,51 +299,52 @@ export default function StatsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   scrollContent: {
-    paddingTop: 32,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
   headerContainer: {
-    marginTop: 25,
     marginBottom: 24,
   },
   header: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#181C20',
-    marginBottom: 4,
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subHeader: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    letterSpacing: 0.5,
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#8E8E93',
+    letterSpacing: 0.3,
   },
   text: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#181C20',
+    color: '#000000',
     marginTop: 25,
     marginBottom: 24,
   },
   statsCardsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 24,
+    gap: 12,
+    marginBottom: 32,
   },
   statsCard: {
-    width: `${(100 - 3) / 2}%`,
+    width: '48%',
     padding: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -352,57 +353,57 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#666',
+    color: '#8E8E93',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1.2,
   },
   statsRow: {
     flexDirection: 'column',
-    gap: 4,
+    gap: 6,
   },
   calories: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ED2737',
+    fontWeight: '800',
+    color: '#000000',
     marginTop: 4,
+    letterSpacing: -0.5,
   },
   historyButton: {
     marginTop: 8,
     marginBottom: 40,
-    borderRadius: 16,
-    overflow: 'hidden',
+    borderRadius: 20,
+    backgroundColor: '#000000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 6,
   },
   historyButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     justifyContent: 'center',
-    paddingVertical: 18,
+    paddingVertical: 20,
     paddingHorizontal: 24,
     gap: 8,
   },
   historyButtonText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#181C20',
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   historyButtonIcon: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#181C20',
+    color: '#FFFFFF',
   },
   streakValue: {
-    fontSize: 14,
-    color: '#181C20',
-    fontWeight: '500',
-    marginTop: 2,
+    fontSize: 15,
+    color: '#000000',
+    fontWeight: '600',
+    marginTop: 4,
   },
   goalLabel: {
     fontWeight: 'bold',
@@ -413,7 +414,7 @@ const styles = StyleSheet.create({
   progressBarBg: {
     flex: 2,
     height: 12,
-    backgroundColor: '#ECECEC',
+    backgroundColor: '#E5E5EA',
     borderRadius: 8,
     marginHorizontal: 8,
     overflow: 'hidden',
@@ -423,10 +424,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   goalValue: {
-    fontWeight: 'bold',
-    color: '#181C20',
-    fontSize: 20,
+    fontWeight: '800',
+    color: '#000000',
+    fontSize: 24,
     marginTop: 8,
+    letterSpacing: -0.5,
   },
   totalsLabel: {
     fontWeight: 'bold',
@@ -435,9 +437,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   totalsValue: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '600',
   },
   bestsLabel: {
     fontWeight: 'bold',
@@ -455,9 +457,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   progressBarBgSmall: {
-    height: 10,
-    backgroundColor: '#ECECEC',
-    borderRadius: 8,
+    height: 8,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 4,
     overflow: 'hidden',
     marginVertical: 8,
   },
