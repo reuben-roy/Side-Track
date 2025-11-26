@@ -1,7 +1,7 @@
 import SlotPicker from '@/components/SlotPicker';
 import { useProfile } from '@/context/ProfileContext';
 import { useUserCapacity } from '@/context/UserCapacityContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sqliteStorage as AsyncStorage } from '@/lib/storage';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';

@@ -14,7 +14,10 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "LSApplicationQueriesSchemes": ["https", "http"]
+        "LSApplicationQueriesSchemes": [
+          "https",
+          "http"
+        ]
       }
     },
     "android": {
@@ -50,7 +53,8 @@
       "expo-secure-store",
       [
         "expo-apple-authentication"
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true

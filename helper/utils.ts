@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sqliteStorage as AsyncStorage } from '@/lib/storage';
 import { exercises, maxMuscleCapacity, recoveryRatePerHour } from '../constants/Exercises';
 import { MuscleGroup } from '../constants/MuscleGroups';
 

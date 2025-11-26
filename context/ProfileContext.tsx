@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sqliteStorage as AsyncStorage } from '@/lib/storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 export const FIELDS = [

@@ -1,5 +1,5 @@
 import ProfileButton from '@/components/ProfileButton';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sqliteStorage as AsyncStorage } from '@/lib/storage';
 import React, { useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';
