@@ -1,4 +1,7 @@
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import {
+    getExerciseLimit,
+    getPreference,
+} from '@/lib/database';
 import { exercises, maxMuscleCapacity, recoveryRatePerHour } from '../constants/Exercises';
 import { MuscleGroup } from '../constants/MuscleGroups';
 
@@ -64,17 +67,9 @@ const userEstimated1RMs: UserEstimated1RMs = {
 // --- Get user-specific 1RM for an exercise ---
 async function getUserCapacityLimit(exerciseName: string): Promise<number> {
     try {
-        const allKeys = await AsyncStorage.getAllKeys();
-        const capacityKeys = allKeys.filter(key => key.startsWith('userCapacityLimits_'));
-        
-        if (capacityKeys.length > 0) {
-            const limitsStr = await AsyncStorage.getItem(capacityKeys[0]);
-            if (limitsStr) {
-                const limits = JSON.parse(limitsStr);
-                if (limits[exerciseName] !== undefined) {
-                    return limits[exerciseName];
-                }
-            }
+        const limit = await getExerciseLimit(exerciseName);
+        if (limit !== null) {
+            return limit;
         }
     } catch (error) {
         console.error('Error loading user capacity limit:', error);
@@ -84,15 +79,12 @@ async function getUserCapacityLimit(exerciseName: string): Promise<number> {
     return userEstimated1RMs[exerciseName] ?? 100;
 }
 
-// --- Get muscle-specific 1RM from AsyncStorage ---
+// --- Get muscle-specific 1RM from database ---
 async function getMuscle1RM(muscleKey: string): Promise<number> {
     try {
-        const muscle1RMsStr = await AsyncStorage.getItem('muscle1RMs');
-        if (muscle1RMsStr) {
-            const muscle1RMs = JSON.parse(muscle1RMsStr);
-            if (muscle1RMs[muscleKey] !== undefined) {
-                return muscle1RMs[muscleKey];
-            }
+        const muscle1RMs = await getPreference<Record<string, number>>('muscle1RMs', {});
+        if (muscle1RMs[muscleKey] !== undefined) {
+            return muscle1RMs[muscleKey];
         }
     } catch (error) {
         console.error('Error loading muscle 1RM:', error);
@@ -126,13 +118,11 @@ function estimateMuscle1RMFromSet(
     return exercise1RM * (involvement || 0.5);
 }
 
-// --- Get fatigue parameters (customizable via AsyncStorage) ---
+// --- Get fatigue parameters (customizable via database) ---
 async function getFatigueParams() {
     try {
-        const storedParams = await AsyncStorage.getItem('fatigueParams');
-        if (storedParams) {
-            return { ...defaultFatigueParams, ...JSON.parse(storedParams) };
-        }
+        const storedParams = await getPreference<typeof defaultFatigueParams>('fatigueParams', defaultFatigueParams);
+        return { ...defaultFatigueParams, ...storedParams };
     } catch (error) {
         console.error('Error loading fatigue params:', error);
     }
@@ -142,11 +132,8 @@ async function getFatigueParams() {
 // --- Get user bodyweight ---
 async function getUserBodyweight(): Promise<number> {
     try {
-        const settings = await AsyncStorage.getItem('drainSettings');
-        if (settings) {
-            const parsed = JSON.parse(settings);
-            return parsed.userBodyweight || 150;
-        }
+        const userBodyweight = await getPreference<number>('userBodyweight', 150);
+        return userBodyweight;
     } catch (error) {
         console.error('Error loading bodyweight:', error);
     }
@@ -226,12 +213,9 @@ export async function calculateCapacityDrain(
 // --- Get recovery rate for a muscle ---
 async function getRecoveryRate(muscle: string): Promise<number> {
     try {
-        const customRatesStr = await AsyncStorage.getItem('customRecoveryRates');
-        if (customRatesStr) {
-            const customRates = JSON.parse(customRatesStr);
-            if (customRates[muscle] !== undefined) {
-                return customRates[muscle];
-            }
+        const customRates = await getPreference<Record<string, number>>('customRecoveryRates', {});
+        if (customRates[muscle] !== undefined) {
+            return customRates[muscle];
         }
     } catch (error) {
         console.error('Error loading custom recovery rates:', error);

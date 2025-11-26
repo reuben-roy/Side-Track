@@ -1,4 +1,4 @@
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import { getProfile, saveProfile } from '@/lib/database';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 export const FIELDS = [
@@ -47,18 +47,18 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
 
   const loadProfile = async () => {
     try {
-      const stored = await AsyncStorage.getItem('profile');
+      const stored = await getProfile();
       if (stored) {
-        setProfile(JSON.parse(stored));
+        setProfile(stored);
       } else {
-        const defaultProfile = {
+        const defaultProfile: Profile = {
           weight: FIELDS[0].default,
           height: FIELDS[1].default,
           calorieGoal: FIELDS[2].default,
           gender: FIELDS[3].default,
         };
         setProfile(defaultProfile);
-        await AsyncStorage.setItem('profile', JSON.stringify(defaultProfile));
+        await saveProfile(defaultProfile);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -71,7 +71,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
     try {
       const updated = { ...profile, [key]: value };
       setProfile(updated);
-      await AsyncStorage.setItem('profile', JSON.stringify(updated));
+      await saveProfile(updated);
     } catch (error) {
       console.error('Error updating profile:', error);
     }
@@ -80,7 +80,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
   const updateFullProfile = async (newProfile: Profile) => {
     try {
       setProfile(newProfile);
-      await AsyncStorage.setItem('profile', JSON.stringify(newProfile));
+      await saveProfile(newProfile);
     } catch (error) {
       console.error('Error updating full profile:', error);
     }

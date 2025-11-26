@@ -1,3 +1,4 @@
+import { closeDatabase, initializeDatabaseForUser } from '@/lib/database';
 import { supabase } from '@/lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -14,6 +15,7 @@ type SupabaseAuthContextType = {
   session: Session | null;
   loading: boolean;
   error: string | null;
+  databaseReady: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -24,6 +26,7 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextType>({
   session: null,
   loading: true,
   error: null,
+  databaseReady: false,
   signInWithGoogle: async () => {},
   signInWithApple: async () => {},
   signOut: async () => {},
@@ -34,25 +37,55 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [databaseReady, setDatabaseReady] = useState(false);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Get initial session and initialize database
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Initialize database for the user
+      if (session?.user?.id) {
+        try {
+          await initializeDatabaseForUser(session.user.id);
+          setDatabaseReady(true);
+          console.log('Database initialized for user:', session.user.id);
+        } catch (err) {
+          console.error('Failed to initialize database:', err);
+          setError('Failed to initialize user data');
+        }
+      }
+      
       setLoading(false);
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Navigate based on auth state
-      if (session) {
+      // Handle database for user changes
+      if (session?.user?.id) {
+        try {
+          await initializeDatabaseForUser(session.user.id);
+          setDatabaseReady(true);
+          console.log('Database initialized for user:', session.user.id);
+        } catch (err) {
+          console.error('Failed to initialize database:', err);
+          setError('Failed to initialize user data');
+        }
         router.replace('/(protected)/(tabs)');
       } else {
+        // User logged out - close database
+        try {
+          await closeDatabase();
+          setDatabaseReady(false);
+          console.log('Database closed on logout');
+        } catch (err) {
+          console.error('Error closing database:', err);
+        }
         router.replace('/login');
       }
     });
@@ -201,7 +234,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   };
 
   return (
-    <SupabaseAuthContext.Provider value={{ user, session, loading, error, signInWithGoogle, signInWithApple, signOut }}>
+    <SupabaseAuthContext.Provider value={{ user, session, loading, error, databaseReady, signInWithGoogle, signInWithApple, signOut }}>
       {children}
     </SupabaseAuthContext.Provider>
   );

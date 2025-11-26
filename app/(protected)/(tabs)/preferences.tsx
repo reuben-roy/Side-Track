@@ -1,4 +1,8 @@
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import {
+    clearAllData as clearDatabase,
+    getAllPreferences,
+    setPreference
+} from '@/lib/database';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -74,41 +78,34 @@ export default function PreferencesScreen() {
 
   const loadPreferences = async () => {
     try {
-      const stored = await AsyncStorage.getItem('userPreferences');
-      if (stored) {
-        const loadedPrefs = JSON.parse(stored);
-        setPreferences(loadedPrefs);
-        setCustomRates(loadedPrefs.customRecoveryRates || {});
-        const loadedDrain = loadedPrefs.drainSettings || DEFAULT_DRAIN_SETTINGS;
-        setDrainSettings(loadedDrain);
-        
-        // Set input field states
-        setOverallMultiplierInput(loadedDrain.overallMultiplier.toFixed(1));
-        setMetCoefInput(loadedDrain.metCoefficient.toFixed(2));
-        setRepsCoefInput(loadedDrain.repsCoefficient.toFixed(2));
-        setIntensityCoefInput(loadedDrain.intensityCoefficient.toFixed(2));
-        setBodyweightInput(loadedDrain.userBodyweight.toFixed(0));
-      }
+      // Load all preferences from database
+      const allPrefs = await getAllPreferences();
       
-      // Also load custom recovery rates if stored separately
-      const storedRates = await AsyncStorage.getItem('customRecoveryRates');
-      if (storedRates) {
-        setCustomRates(JSON.parse(storedRates));
-      }
-
-      // Also load drain settings if stored separately
-      const storedDrain = await AsyncStorage.getItem('drainSettings');
-      if (storedDrain) {
-        const loadedDrain = JSON.parse(storedDrain);
-        setDrainSettings(loadedDrain);
-        
-        // Set input field states
-        setOverallMultiplierInput(loadedDrain.overallMultiplier.toFixed(1));
-        setMetCoefInput(loadedDrain.metCoefficient.toFixed(2));
-        setRepsCoefInput(loadedDrain.repsCoefficient.toFixed(2));
-        setIntensityCoefInput(loadedDrain.intensityCoefficient.toFixed(2));
-        setBodyweightInput(loadedDrain.userBodyweight.toFixed(0));
-      }
+      // Reconstruct the preferences object
+      const loadedPrefs: UserPreferences = {
+        enableNotifications: (allPrefs.enableNotifications as boolean) ?? DEFAULT_PREFERENCES.enableNotifications,
+        enableHaptics: (allPrefs.enableHaptics as boolean) ?? DEFAULT_PREFERENCES.enableHaptics,
+        enableSoundEffects: (allPrefs.enableSoundEffects as boolean) ?? DEFAULT_PREFERENCES.enableSoundEffects,
+        darkMode: (allPrefs.darkMode as boolean) ?? DEFAULT_PREFERENCES.darkMode,
+        units: (allPrefs.units as 'metric' | 'imperial') ?? DEFAULT_PREFERENCES.units,
+        restTimerEnabled: (allPrefs.restTimerEnabled as boolean) ?? DEFAULT_PREFERENCES.restTimerEnabled,
+        autoLogWorkouts: (allPrefs.autoLogWorkouts as boolean) ?? DEFAULT_PREFERENCES.autoLogWorkouts,
+        showCaloriesBurned: (allPrefs.showCaloriesBurned as boolean) ?? DEFAULT_PREFERENCES.showCaloriesBurned,
+        customRecoveryRates: allPrefs.customRecoveryRates as { [key in MuscleGroup]?: number } || {},
+        drainSettings: allPrefs.drainSettings as DrainSettings || DEFAULT_DRAIN_SETTINGS,
+      };
+      
+      setPreferences(loadedPrefs);
+      setCustomRates(loadedPrefs.customRecoveryRates || {});
+      const loadedDrain = loadedPrefs.drainSettings || DEFAULT_DRAIN_SETTINGS;
+      setDrainSettings(loadedDrain);
+      
+      // Set input field states
+      setOverallMultiplierInput(loadedDrain.overallMultiplier.toFixed(1));
+      setMetCoefInput(loadedDrain.metCoefficient.toFixed(2));
+      setRepsCoefInput(loadedDrain.repsCoefficient.toFixed(2));
+      setIntensityCoefInput(loadedDrain.intensityCoefficient.toFixed(2));
+      setBodyweightInput(loadedDrain.userBodyweight.toFixed(0));
     } catch (error) {
       console.error('Error loading preferences:', error);
     }
@@ -117,7 +114,10 @@ export default function PreferencesScreen() {
   const savePreferences = async (newPreferences: UserPreferences) => {
     try {
       setIsSaving(true);
-      await AsyncStorage.setItem('userPreferences', JSON.stringify(newPreferences));
+      // Save each preference individually
+      for (const [key, value] of Object.entries(newPreferences)) {
+        await setPreference(key, value);
+      }
       setPreferences(newPreferences);
       // Show brief success feedback
       setTimeout(() => setIsSaving(false), 500);
@@ -143,8 +143,8 @@ export default function PreferencesScreen() {
     const newRates = { ...customRates, [muscle]: numValue };
     setCustomRates(newRates);
     
-    // Save to AsyncStorage
-    await AsyncStorage.setItem('customRecoveryRates', JSON.stringify(newRates));
+    // Save to database
+    await setPreference('customRecoveryRates', newRates);
     
     // Also update preferences
     const newPreferences = { ...preferences, customRecoveryRates: newRates };
@@ -162,7 +162,7 @@ export default function PreferencesScreen() {
           style: 'destructive',
           onPress: async () => {
             setCustomRates({});
-            await AsyncStorage.removeItem('customRecoveryRates');
+            await setPreference('customRecoveryRates', {});
             const newPreferences = { ...preferences, customRecoveryRates: {} };
             savePreferences(newPreferences);
           },
@@ -178,8 +178,8 @@ export default function PreferencesScreen() {
     const newSettings = { ...drainSettings, [key]: value };
     setDrainSettings(newSettings);
     
-    // Save to AsyncStorage
-    await AsyncStorage.setItem('drainSettings', JSON.stringify(newSettings));
+    // Save to database
+    await setPreference('drainSettings', newSettings);
     
     // Also update preferences
     const newPreferences = { ...preferences, drainSettings: newSettings };
@@ -205,7 +205,7 @@ export default function PreferencesScreen() {
             setIntensityCoefInput(DEFAULT_DRAIN_SETTINGS.intensityCoefficient.toFixed(2));
             setBodyweightInput(DEFAULT_DRAIN_SETTINGS.userBodyweight.toFixed(0));
             
-            await AsyncStorage.setItem('drainSettings', JSON.stringify(DEFAULT_DRAIN_SETTINGS));
+            await setPreference('drainSettings', DEFAULT_DRAIN_SETTINGS);
             const newPreferences = { ...preferences, drainSettings: DEFAULT_DRAIN_SETTINGS };
             savePreferences(newPreferences);
           },
@@ -253,7 +253,7 @@ export default function PreferencesScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.clear();
+              await clearDatabase();
               setPreferences(DEFAULT_PREFERENCES);
               Alert.alert('Success', 'All data has been cleared');
             } catch (error) {

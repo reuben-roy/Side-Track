@@ -1,4 +1,4 @@
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import { getProfile, getWorkoutLogs, WorkoutLog } from '@/lib/database';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -6,13 +6,6 @@ import CaloriesChart from '../../../components/CaloriesChart';
 import MuscleCapacitySection from '../../../components/MuscleCapacitySection';
 import ProfileButton from '../../../components/ProfileButton';
 import { exercises } from '../../../constants/Exercises';
-
-interface WorkoutLog {
-  exercise: string;
-  weight: number;
-  reps: number;
-  date: string;
-}
 
 // Helper functions for new log format
 function getRepsCount(log: WorkoutLog) {
@@ -48,38 +41,31 @@ export default function StatsScreen() {
   // Function to fetch and calculate stats
   const fetchStats = async () => {
     // Get user weight and calorie goal
-    const profileStr = await AsyncStorage.getItem('profile');
+    const profileData = await getProfile();
     let weightLbs = 170;
     let calorieGoal = 360;
-    if (profileStr) {
-      const profileObj = JSON.parse(profileStr);
+    if (profileData) {
       // Parse weight from string format
-      const weightMatch = profileObj.weight?.match(/(\d+\.?\d*)/);
+      const weightMatch = profileData.weight?.match(/(\d+\.?\d*)/);
       weightLbs = weightMatch ? parseFloat(weightMatch[1]) : 170;
-      calorieGoal = parseInt((profileObj.calorieGoal || '2000').replace(/[^0-9]/g, ''));
-      setProfile(profileObj);
+      calorieGoal = parseInt((profileData.calorieGoal || '2000').replace(/[^0-9]/g, ''));
+      setProfile(profileData);
     }
     const weightKg = weightLbs * 0.453592;
 
-    // Get workout logs
-    const logsStr = await AsyncStorage.getItem('workoutLogs');
+    // Get workout logs (already sorted by date desc)
+    const logs = await getWorkoutLogs();
     let totalCals = 0;
-    let logs: WorkoutLog[] = [];
-    if (logsStr) {
-      logs = JSON.parse(logsStr);
-      // Sort logs by date (newest first)
-      logs.sort((a: WorkoutLog, b: WorkoutLog) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      for (const log of logs) {
-        // Get exercise MET value
-        const exercise = exercises.find(e => e.name === log.exercise);
-        const met = exercise ? exercise.met : 5;
-        // Estimate duration: 2 min per set if timer not used
-        let durationMin = 1 * 2; // 1 set * 2 minutes
-        // Calories = (MET * weightKg * 3.5 / 200) * duration (min)
-        const cals = (met * weightKg * 3.5 / 200) * durationMin;
-        totalCals += cals;
-      }
+    
+    for (const log of logs) {
+      // Get exercise MET value
+      const exercise = exercises.find(e => e.name === log.exercise);
+      const met = exercise ? exercise.met : 5;
+      // Estimate duration: 2 min per set if timer not used
+      let durationMin = 1 * 2; // 1 set * 2 minutes
+      // Calories = (MET * weightKg * 3.5 / 200) * duration (min)
+      const cals = (met * weightKg * 3.5 / 200) * durationMin;
+      totalCals += cals;
     }
     setCalories(Math.round(totalCals));
     setWorkoutLogs(logs);

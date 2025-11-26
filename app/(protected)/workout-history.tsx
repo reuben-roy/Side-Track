@@ -1,15 +1,8 @@
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import { deleteWorkoutLog, getProfile, getWorkoutLogs, WorkoutLog } from '@/lib/database';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { exercises } from '../../constants/Exercises';
-
-interface WorkoutLog {
-  exercise: string;
-  weight: number;
-  reps: number;
-  date: string;
-}
 
 // Helper functions for new log format
 function getRepsCount(log: WorkoutLog) {
@@ -81,9 +74,12 @@ export default function WorkoutHistoryScreen() {
   const performDelete = async (index: number) => {
     console.log('Delete confirmed for index:', index);
     try {
+      const logToDelete = workoutLogs[index];
+      if (logToDelete.id) {
+        await deleteWorkoutLog(logToDelete.id);
+      }
       const updatedLogs = workoutLogs.filter((_, i) => i !== index);
       console.log('Updated logs:', updatedLogs);
-      await AsyncStorage.setItem('workoutLogs', JSON.stringify(updatedLogs));
       setWorkoutLogs(updatedLogs);
     } catch (error) {
       console.error('Error deleting workout:', error);
@@ -98,20 +94,13 @@ export default function WorkoutHistoryScreen() {
   // Function to fetch workout logs
   const fetchWorkoutLogs = async () => {
     // Get user profile
-    const profileStr = await AsyncStorage.getItem('profile');
-    if (profileStr) {
-      const profileObj = JSON.parse(profileStr);
-      setProfile(profileObj);
+    const profileData = await getProfile();
+    if (profileData) {
+      setProfile(profileData);
     }
 
-    // Get workout logs
-    const logsStr = await AsyncStorage.getItem('workoutLogs');
-    let logs: WorkoutLog[] = [];
-    if (logsStr) {
-      logs = JSON.parse(logsStr);
-      // Sort logs by date (newest first)
-      logs.sort((a: WorkoutLog, b: WorkoutLog) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }
+    // Get workout logs (already sorted by date desc in database)
+    const logs = await getWorkoutLogs();
     setWorkoutLogs(logs);
   };
 

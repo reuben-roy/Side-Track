@@ -1,4 +1,8 @@
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import {
+    getMuscleCapacity,
+    getWorkoutLogs,
+    updateAllMuscleCapacity,
+} from '@/lib/database';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -46,22 +50,15 @@ export default function MuscleCapacitySection() {
   const [muscleCapacity, setMuscleCapacity] = useState<MuscleCapacity>(DEFAULT_MUSCLE_CAPACITY);
   const [lastExerciseTime, setLastExerciseTime] = useState<number | null>(null);
 
-  // Load from AsyncStorage whenever the screen comes into focus
+  // Load from database whenever the screen comes into focus
   const loadMuscleCapacity = useCallback(async () => {
-    const stored = await AsyncStorage.getItem('muscleCapacity');
-    if (stored) setMuscleCapacity(fillMissingMuscleCapacity(JSON.parse(stored)));
+    const storedCapacity = await getMuscleCapacity();
+    setMuscleCapacity(fillMissingMuscleCapacity(storedCapacity));
     // Find the most recent exercise log
-    const logsStr = await AsyncStorage.getItem('workoutLogs');
-    if (logsStr) {
-      const logs = JSON.parse(logsStr);
-      if (Array.isArray(logs) && logs.length > 0) {
-        // Find the latest log date
-        const latest = logs.reduce((max, log) => {
-          const t = new Date(log.date).getTime();
-          return t > max ? t : max;
-        }, 0);
-        setLastExerciseTime(latest);
-      }
+    const logs = await getWorkoutLogs(1); // Get most recent log
+    if (logs.length > 0) {
+      const latest = new Date(logs[0].date).getTime();
+      setLastExerciseTime(latest);
     }
   }, []);
 
@@ -81,7 +78,7 @@ export default function MuscleCapacitySection() {
         (async () => {
           const recovered = fillMissingMuscleCapacity(await applyRecovery(muscleCapacity, hoursPassed));
           setMuscleCapacity(recovered);
-          AsyncStorage.setItem('muscleCapacity', JSON.stringify(recovered));
+          await updateAllMuscleCapacity(recovered);
         })();
       }
     }
@@ -93,7 +90,7 @@ export default function MuscleCapacitySection() {
       (async () => {
         const recovered = fillMissingMuscleCapacity(await applyRecovery(muscleCapacity, 1));
         setMuscleCapacity(recovered);
-        AsyncStorage.setItem('muscleCapacity', JSON.stringify(recovered));
+        await updateAllMuscleCapacity(recovered);
       })();
     }, 60 * 60 * 1000);
     return () => clearInterval(interval);

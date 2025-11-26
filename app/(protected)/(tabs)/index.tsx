@@ -1,5 +1,5 @@
 import ProfileButton from '@/components/ProfileButton';
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import { getMuscleCapacity } from '@/lib/database';
 import React, { useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';
@@ -63,11 +63,8 @@ export default function HomeScreen() {
       }),
     ]).start();
 
-    // Get current muscle capacity from AsyncStorage
-    const prevCapacityStr = await AsyncStorage.getItem('muscleCapacity');
-    let prevCapacity: Record<string, number> = prevCapacityStr 
-      ? JSON.parse(prevCapacityStr) 
-      : { ...maxMuscleCapacity };
+    // Get current muscle capacity from database
+    const prevCapacity = await getMuscleCapacity();
 
     // Filter out exercises that use muscles below 30% capacity
     const availableExercises = exercises.filter(exercise => {

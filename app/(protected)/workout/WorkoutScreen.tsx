@@ -1,7 +1,12 @@
 import SlotPicker from '@/components/SlotPicker';
 import { useProfile } from '@/context/ProfileContext';
 import { useUserCapacity } from '@/context/UserCapacityContext';
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import {
+    addWorkoutLog,
+    getExerciseStats as getDBExerciseStats,
+    getMuscleCapacity,
+    updateAllMuscleCapacity,
+} from '@/lib/database';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';
@@ -79,10 +84,7 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
 
   const loadMuscleCapacity = async () => {
     try {
-      const capacityStr = await AsyncStorage.getItem('muscleCapacity');
-      const capacity: Record<string, number> = capacityStr 
-        ? JSON.parse(capacityStr) 
-        : { ...maxMuscleCapacity };
+      const capacity = await getMuscleCapacity();
       setMuscleCapacity(capacity);
     } catch (error) {
       console.error('Error loading muscle capacity:', error);
@@ -122,49 +124,13 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
 
   const fetchExerciseStats = async () => {
     try {
-      const logsStr = await AsyncStorage.getItem('workoutLogs');
-      if (!logsStr) {
-        setExerciseStats({
-          estimated1RM: capacityLimits[exercise] || 0,
-          maxWeight: 0,
-          maxReps: 0,
-          totalSets: 0,
-          lastWorkoutDate: null,
-        });
-        return;
-      }
-
-      const logs: WorkoutLog[] = JSON.parse(logsStr);
-      const exerciseLogs = logs.filter(log => log.exercise === exercise);
-
-      if (exerciseLogs.length === 0) {
-        setExerciseStats({
-          estimated1RM: capacityLimits[exercise] || 0,
-          maxWeight: 0,
-          maxReps: 0,
-          totalSets: 0,
-          lastWorkoutDate: null,
-        });
-        return;
-      }
-
-      // Calculate stats
-      let maxWeight = 0;
-      let maxReps = 0;
-      const sortedLogs = exerciseLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const lastWorkoutDate = sortedLogs[0].date;
-
-      exerciseLogs.forEach(log => {
-        if (log.weight > maxWeight) maxWeight = log.weight;
-        if (log.reps > maxReps) maxReps = log.reps;
-      });
-
+      const stats = await getDBExerciseStats(exercise);
       setExerciseStats({
         estimated1RM: capacityLimits[exercise] || 0,
-        maxWeight,
-        maxReps,
-        totalSets: exerciseLogs.length,
-        lastWorkoutDate,
+        maxWeight: stats.maxWeight,
+        maxReps: stats.maxReps,
+        totalSets: stats.totalSets,
+        lastWorkoutDate: stats.lastWorkoutDate,
       });
     } catch (error) {
       console.error('Error fetching exercise stats:', error);
@@ -210,14 +176,11 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
     };
 
     try {
-      const prev = await AsyncStorage.getItem('workoutLogs');
-      const logs = prev ? JSON.parse(prev) : [];
-      logs.push(workout);
-      await AsyncStorage.setItem('workoutLogs', JSON.stringify(logs));
+      // Add workout log to database
+      await addWorkoutLog(exercise, actualWeight, currentReps);
 
       // --- Decrease muscle capacity after logging workout ---
-      const prevCapacityStr = await AsyncStorage.getItem('muscleCapacity');
-      let prevCapacity: Record<string, number> = prevCapacityStr ? JSON.parse(prevCapacityStr) : { ...require('../../../constants/Exercises').maxMuscleCapacity };
+      const prevCapacity = await getMuscleCapacity();
       
       console.log('=== MUSCLE CAPACITY DEBUG ===');
       console.log('Exercise:', exercise);
@@ -229,22 +192,23 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       const drain = await calculateCapacityDrain(exercise, actualWeight, currentReps);
       console.log('Calculated Drain:', drain);
       
+      const newCapacity = { ...prevCapacity };
       muscleGroups.forEach(muscle => {
         if (drain[muscle]) {
           const oldValue = prevCapacity[muscle] || 100;
           const drainValue = drain[muscle]!;
           const newValue = Math.max(0, oldValue - drainValue);
           console.log(`${muscle}: ${oldValue} - ${drainValue} = ${newValue}`);
-          prevCapacity[muscle] = newValue;
+          newCapacity[muscle] = newValue;
         }
       });
       
-      console.log('New Capacity:', prevCapacity);
-      await AsyncStorage.setItem('muscleCapacity', JSON.stringify(prevCapacity));
+      console.log('New Capacity:', newCapacity);
+      await updateAllMuscleCapacity(newCapacity);
       console.log('=== END DEBUG ===');
       
       // Update local state to reflect changes immediately
-      setMuscleCapacity(prevCapacity);
+      setMuscleCapacity(newCapacity);
       // --- End muscle capacity update ---
 
       // --- Check for Personal Record and update 1RM estimate ---

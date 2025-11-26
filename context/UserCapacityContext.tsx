@@ -1,4 +1,9 @@
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import {
+    getAllExerciseLimits,
+    getWorkoutLogs,
+    saveAllExerciseLimits,
+    saveExerciseLimit,
+} from '@/lib/database';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 // import { useAuth } from './AuthContext'; // OLD: Custom OAuth
 import { useSupabaseAuth } from './SupabaseAuthContext'; // NEW: Supabase Auth
@@ -76,36 +81,19 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
     loadCapacityLimits();
   }, [user]);
 
-  const getStorageKey = () => {
-    // User-specific storage key based on logged-in user
-    if (!user) {
-      console.warn('No user logged in');
-      return 'userCapacityLimits_default';
-    }
-    // return `userCapacityLimits_${user.sub}`; // OLD: Custom OAuth used 'sub'
-    return `userCapacityLimits_${user.id}`; // NEW: Supabase uses 'id'
-  };
-
   const loadCapacityLimits = async () => {
     setIsLoading(true);
     try {
-      const storageKey = getStorageKey();
-      const stored = await AsyncStorage.getItem(storageKey);
+      const storedLimits = await getAllExerciseLimits();
       
-      if (stored) {
-        const parsedLimits = JSON.parse(stored);
+      if (Object.keys(storedLimits).length > 0) {
         // Ensure all exercises have a value, fill in missing ones with defaults
-        const completeLimits = { ...DEFAULT_CAPACITY_LIMITS };
-        for (const exerciseName in parsedLimits) {
-          if (parsedLimits[exerciseName] !== undefined) {
-            completeLimits[exerciseName] = parsedLimits[exerciseName];
-          }
-        }
+        const completeLimits = { ...DEFAULT_CAPACITY_LIMITS, ...storedLimits };
         setCapacityLimits(completeLimits);
       } else {
-        // No stored data, use defaults
+        // No stored data, use defaults and save them
         setCapacityLimits(DEFAULT_CAPACITY_LIMITS);
-        await AsyncStorage.setItem(storageKey, JSON.stringify(DEFAULT_CAPACITY_LIMITS));
+        await saveAllExerciseLimits(DEFAULT_CAPACITY_LIMITS);
       }
     } catch (error) {
       console.error('Error loading user capacity limits:', error);
@@ -119,8 +107,7 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
     try {
       const updated = { ...capacityLimits, [exerciseName]: value };
       setCapacityLimits(updated);
-      const storageKey = getStorageKey();
-      await AsyncStorage.setItem(storageKey, JSON.stringify(updated));
+      await saveExerciseLimit(exerciseName, value);
     } catch (error) {
       console.error('Error updating capacity limit:', error);
     }
@@ -164,22 +151,16 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
    */
   const estimateFromAllWorkouts = async (): Promise<number> => {
     try {
-      const logsStr = await AsyncStorage.getItem('workoutLogs');
-      if (!logsStr) {
+      const logs = await getWorkoutLogs();
+      if (logs.length === 0) {
         console.log('No workout logs found');
-        return 0;
-      }
-
-      const logs = JSON.parse(logsStr);
-      if (!Array.isArray(logs) || logs.length === 0) {
-        console.log('No workout logs to process');
         return 0;
       }
 
       // Group logs by exercise and find best performance for each
       const bestPerformance: { [exercise: string]: number } = {};
       
-      logs.forEach((log: { exercise: string; weight: number; reps: number }) => {
+      logs.forEach((log) => {
         if (log.exercise && typeof log.weight === 'number' && typeof log.reps === 'number') {
           const estimated1RM = Math.round(log.weight * (1 + log.reps / 30));
           
@@ -206,8 +187,7 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
 
       if (updatedCount > 0) {
         setCapacityLimits(newLimits);
-        const storageKey = getStorageKey();
-        await AsyncStorage.setItem(storageKey, JSON.stringify(newLimits));
+        await saveAllExerciseLimits(newLimits);
       }
 
       return updatedCount;
@@ -220,8 +200,7 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
   const resetToDefaults = async () => {
     try {
       setCapacityLimits(DEFAULT_CAPACITY_LIMITS);
-      const storageKey = getStorageKey();
-      await AsyncStorage.setItem(storageKey, JSON.stringify(DEFAULT_CAPACITY_LIMITS));
+      await saveAllExerciseLimits(DEFAULT_CAPACITY_LIMITS);
     } catch (error) {
       console.error('Error resetting capacity limits:', error);
     }

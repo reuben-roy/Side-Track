@@ -1,7 +1,14 @@
 import * as SQLite from 'expo-sqlite';
+import {
+    initializeDatabase
+} from './database';
+
+// Re-export all database functions for easy access
+export * from './database';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
+// Legacy database for migration purposes
 const getDb = () => {
   if (!dbPromise) {
     dbPromise = (async () => {
@@ -12,6 +19,8 @@ const getDb = () => {
           value TEXT
         );
       `);
+      // Initialize new database (will migrate data)
+      await initializeDatabase();
       return db;
     })();
   }

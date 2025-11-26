@@ -1,4 +1,4 @@
-import { sqliteStorage as AsyncStorage } from '@/lib/storage';
+import { getPreference } from '@/lib/database';
 import { exercises, maxMuscleCapacity, recoveryRatePerHour } from '../constants/Exercises';
 import { MuscleGroup } from '../constants/MuscleGroups';
 
@@ -67,13 +67,23 @@ const userEstimated1RMs: UserEstimated1RMs = {
     'Rope Triceps Pushdown': 110,
 };
 
-// Get drain settings from AsyncStorage or use defaults
+// Get drain settings from database or use defaults
 async function getDrainSettings() {
     try {
-        const storedSettings = await AsyncStorage.getItem('drainSettings');
-        if (storedSettings) {
-            return JSON.parse(storedSettings);
-        }
+        const storedSettings = await getPreference<{
+            overallMultiplier: number;
+            metCoefficient: number;
+            repsCoefficient: number;
+            intensityCoefficient: number;
+            userBodyweight: number;
+        }>('drainSettings', {
+            overallMultiplier: 5.0,
+            metCoefficient: 0.1,
+            repsCoefficient: 0.05,
+            intensityCoefficient: 0.5,
+            userBodyweight: 150,
+        });
+        return storedSettings;
     } catch (error) {
         console.error('Error loading drain settings:', error);
     }
@@ -140,12 +150,9 @@ export async function calculateCapacityDrain(
 // Get recovery rate for a muscle, checking custom rates first
 async function getRecoveryRate(muscle: string): Promise<number> {
     try {
-        const customRatesStr = await AsyncStorage.getItem('customRecoveryRates');
-        if (customRatesStr) {
-            const customRates = JSON.parse(customRatesStr);
-            if (customRates[muscle] !== undefined) {
-                return customRates[muscle];
-            }
+        const customRates = await getPreference<Record<string, number>>('customRecoveryRates', {});
+        if (customRates[muscle] !== undefined) {
+            return customRates[muscle];
         }
     } catch (error) {
         console.error('Error loading custom recovery rates:', error);
