@@ -171,17 +171,19 @@ export default function StatsScreen() {
   }
 
   return (
-    <ScrollView 
-      style={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <ProfileButton top={57} right={20} />
-      
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <Text style={styles.header}>Stats</Text>
-        <Text style={styles.subHeader}>Track your progress and achievements</Text>
+    <View style={styles.container}>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.header}>Stats</Text>
+          <Text style={styles.subHeader}>Track your progress and achievements</Text>
+        </View>
+        <ProfileButton />
       </View>
+      
+      <ScrollView 
+        style={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
 
       <CaloriesChart
         workoutLogs={workoutLogs}
@@ -279,6 +281,7 @@ export default function StatsScreen() {
           </View>
       </TouchableOpacity>
     </ScrollView>
+    </View>
   );
 }
 
@@ -287,13 +290,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  scrollContent: {
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
     paddingTop: 60,
+    paddingBottom: 20,
+  },
+  scrollContent: {
+    flex: 1,
     paddingHorizontal: 24,
     paddingBottom: 40,
-  },
-  headerContainer: {
-    marginBottom: 24,
   },
   header: {
     fontSize: 34,

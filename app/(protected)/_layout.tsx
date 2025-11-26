@@ -2,7 +2,7 @@
 import { ProfileProvider } from '@/context/ProfileContext';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext'; // NEW: Supabase Auth
 import { UserCapacityProvider } from '@/context/UserCapacityContext';
-import { Redirect, Slot } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 // import 'react-native-reanimated';
@@ -29,7 +29,11 @@ export default function ProtectedLayout() {
   return (
     <ProfileProvider>
       <UserCapacityProvider>
-        <Slot />
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="workout/WorkoutScreen" options={{ headerShown: false }} />
+          <Stack.Screen name="workout-history" options={{ title: 'Workout History' }} />
+        </Stack>
       </UserCapacityProvider>
     </ProfileProvider>
   );

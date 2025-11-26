@@ -36,7 +36,7 @@ interface ProfileButtonProps {
   right?: number;
 }
 
-export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonProps) {
+export default function ProfileButton({ top, right }: ProfileButtonProps) {
   // const auth = useAuth(); // OLD
   const auth = useSupabaseAuth(); // NEW
   const { profile, updateProfile } = useProfile();
@@ -78,7 +78,13 @@ export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonPro
 
   return (
     <>
-      <TouchableOpacity style={[styles.profileButton, { top, right }]} onPress={() => setModalVisible(true)}>
+      <TouchableOpacity 
+        style={[
+          styles.profileButton, 
+          top !== undefined && right !== undefined && { position: 'absolute', top, right }
+        ]} 
+        onPress={() => setModalVisible(true)}
+      >
         {user?.user_metadata?.picture || user?.user_metadata?.avatar_url ? (
           <Image source={{ uri: user.user_metadata.picture || user.user_metadata.avatar_url }} style={styles.profileImage} />
         ) : (
@@ -166,7 +172,6 @@ export default function ProfileButton({ top = 50, right = 20 }: ProfileButtonPro
 
 const styles = StyleSheet.create({
   profileButton: {
-    position: 'absolute',
     zIndex: 1000,
   },
   profileImage: {

@@ -156,12 +156,13 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <ProfileButton top={57} right={20} />
-      
       {/* Header Section */}
-      <View style={styles.headerContainer}>
-      <Text style={styles.header}>SideTrack</Text>
-      <Text style={styles.subHeader}>Work Out till you Pass Out</Text>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.header}>SideTrack</Text>
+          <Text style={styles.subHeader}>Work Out till you Pass Out</Text>
+        </View>
+        <ProfileButton />
       </View>
 
       {/* Title Section */}
@@ -327,12 +328,15 @@ function SlotPicker({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
     backgroundColor: '#FFFFFF',
   },
-  headerContainer: {
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: 24,
-    marginBottom: 24,
+    paddingTop: 60,
+    paddingBottom: 20,
   },
   header: {
     fontSize: 34,
