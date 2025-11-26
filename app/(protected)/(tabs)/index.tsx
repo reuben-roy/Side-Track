@@ -170,45 +170,41 @@ export default function HomeScreen() {
       <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
       </View>
 
-      {/* Slot Pickers Card */}
-      <View style={styles.slotCard}>
-      <View style={styles.slotRow}>
-        <View style={styles.slotCol}>
-        <Text style={styles.slotLabel}>Exercise</Text>
-        <SlotPicker data={EXERCISES} selectedIndex={exerciseIdx} onSelect={setExerciseIdx} />
+      {/* Main Content */}
+      <View style={styles.mainContent}>
+        {/* Left Side: Exercise Picker */}
+        <View style={styles.pickerColumn}>
+          <Text style={styles.slotLabel}>Exercise</Text>
+          <SlotPicker 
+            data={EXERCISES} 
+            selectedIndex={exerciseIdx} 
+            onSelect={setExerciseIdx} 
+            style={{ flex: 2 }}
+          />
         </View>
-        <View style={styles.slotCol}>
-        <Text style={styles.slotLabel}>Weight</Text>
-        <SlotPicker data={WEIGHTS} selectedIndex={weightIdx} onSelect={setWeightIdx} />
-        </View>
-        <View style={styles.slotCol}>
-        <Text style={styles.slotLabel}>Reps</Text>
-        <SlotPicker data={REPS} selectedIndex={repsIdx} onSelect={setRepsIdx} />
-        </View>
-      </View>
-      </View>
 
-      {/* Buttons */}
-      <View style={styles.buttonContainer}>
-      <TouchableOpacity 
-        style={styles.pickButton} 
-        onPress={() => setShowWorkout(true)}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.pickButtonText}>Select Exercise</Text>
-      </TouchableOpacity>
-      
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <TouchableOpacity 
-        style={styles.spinButton} 
-        onPress={spin}
-        activeOpacity={0.8}
-        >
-        <View style={styles.spinButtonGradient}>
-          <Text style={styles.spinButtonText}>Select For Me</Text>
+        {/* Right Side: Buttons */}
+        <View style={styles.buttonsColumn}>
+          <TouchableOpacity 
+            style={styles.pickButton} 
+            onPress={() => setShowWorkout(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.pickButtonText}>Select Exercise</Text>
+          </TouchableOpacity>
+          
+          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+            <TouchableOpacity 
+              style={styles.spinButton} 
+              onPress={spin}
+              activeOpacity={0.8}
+            >
+              <View style={styles.spinButtonGradient}>
+                <Text style={styles.spinButtonText}>Randomize</Text>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
-        </TouchableOpacity>
-      </Animated.View>
       </View>
     </View>
   );
@@ -228,6 +224,7 @@ function SlotPicker({
   const flatListRef = useRef<FlatList>(null);
   const scrollY = useRef(new Animated.Value(selectedIndex * ITEM_TOTAL_HEIGHT)).current;
   const lastIndexRef = useRef(selectedIndex);
+  const [containerHeight, setContainerHeight] = useState(ITEM_TOTAL_HEIGHT * VISIBLE_ITEMS);
 
   React.useEffect(() => {
     flatListRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
@@ -250,7 +247,10 @@ function SlotPicker({
   };
 
   return (
-    <View style={[{ height: ITEM_TOTAL_HEIGHT * VISIBLE_ITEMS, position: 'relative' }, style]}>
+    <View 
+      style={[{ height: ITEM_TOTAL_HEIGHT * VISIBLE_ITEMS, position: 'relative' }, style]}
+      onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
+    >
       {/* Center highlight overlay */}
       <View
         pointerEvents="none"
@@ -278,7 +278,7 @@ function SlotPicker({
         showsVerticalScrollIndicator={false}
         style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingVertical: ITEM_TOTAL_HEIGHT * Math.floor(VISIBLE_ITEMS / 2),
+          paddingVertical: (containerHeight - ITEM_TOTAL_HEIGHT) / 2,
         }}
         snapToInterval={ITEM_TOTAL_HEIGHT}
         decelerationRate="normal"
@@ -362,23 +362,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.7,
   },
-  slotCard: {
-    marginHorizontal: 24,
-    marginBottom: 40,
-  },
-  slotRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 12,
-  },
-  slotCol: {
+  mainContent: {
     flex: 1,
-    alignItems: 'center',
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    gap: 14,
+    marginBottom: 24,
+  },
+  pickerColumn: {
+    flex: 2,
     borderWidth: 1,
     borderColor: '#E5E5EA',
     borderRadius: 16,
     paddingVertical: 12,
+    overflow: 'hidden',
+  },
+  buttonsColumn: {
+    flex: 2,
+    justifyContent: 'flex-end',
+    gap: 16,
   },
   slotLabel: {
     fontSize: 12,
@@ -399,10 +401,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     textAlign: 'center',
-  },
-  buttonContainer: {
-    paddingHorizontal: 24,
-    gap: 16,
   },
   spinButton: {
     borderRadius: 20,
