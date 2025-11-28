@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS user_strength (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   
+  -- User display name
+  username TEXT,                                    -- Generated username for leaderboard display
+  
   -- Primary strength metrics
   total_score INTEGER NOT NULL DEFAULT 0,           -- Sum of all compound lifts
   wilks_score REAL,                                 -- Bodyweight-adjusted score (optional)
@@ -52,6 +55,11 @@ CREATE INDEX IF NOT EXISTS idx_user_strength_wilks_score
 
 CREATE INDEX IF NOT EXISTS idx_user_strength_user_id 
   ON user_strength(user_id);
+
+-- Index for username uniqueness checks (important for performance)
+CREATE INDEX IF NOT EXISTS idx_user_strength_username 
+  ON user_strength(username) 
+  WHERE username IS NOT NULL;
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES

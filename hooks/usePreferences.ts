@@ -20,6 +20,7 @@ export interface UserPreferences {
   restTimerEnabled: boolean;
   autoLogWorkouts: boolean;
   showCaloriesBurned: boolean;
+  shareLocation: boolean;
   customRecoveryRates?: { [key in MuscleGroup]?: number };
   drainSettings?: DrainSettings;
 }
@@ -41,6 +42,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   restTimerEnabled: true,
   autoLogWorkouts: true,
   showCaloriesBurned: true,
+  shareLocation: true,
   drainSettings: DEFAULT_DRAIN_SETTINGS,
 };
 
@@ -61,6 +63,7 @@ export function usePreferences() {
         restTimerEnabled: (allPrefs.restTimerEnabled as boolean) ?? DEFAULT_PREFERENCES.restTimerEnabled,
         autoLogWorkouts: (allPrefs.autoLogWorkouts as boolean) ?? DEFAULT_PREFERENCES.autoLogWorkouts,
         showCaloriesBurned: (allPrefs.showCaloriesBurned as boolean) ?? DEFAULT_PREFERENCES.showCaloriesBurned,
+        shareLocation: (allPrefs.shareLocation as boolean) ?? DEFAULT_PREFERENCES.shareLocation,
         customRecoveryRates: allPrefs.customRecoveryRates as { [key in MuscleGroup]?: number } || {},
         drainSettings: allPrefs.drainSettings as DrainSettings || DEFAULT_DRAIN_SETTINGS,
       };

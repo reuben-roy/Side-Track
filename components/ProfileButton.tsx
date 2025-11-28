@@ -6,8 +6,13 @@ import React, { useState } from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ProfileInputField, { InputType } from './ProfileInputField';
 
-// BMI calculation function - handles both metric and imperial
-const calculateBMI = (weight: string, height: string, units: 'metric' | 'imperial'): string => {
+// BMI calculation function - handles both metric and imperial with gender-specific defaults
+const calculateBMI = (
+  weight: string, 
+  height: string, 
+  units: 'metric' | 'imperial',
+  gender?: string | null
+): string => {
   try {
     let weightKg: number;
     let heightMeters: number;
@@ -17,10 +22,15 @@ const calculateBMI = (weight: string, height: string, units: 'metric' | 'imperia
       const weightMatch = weight.match(/(\d+(?:\.\d+)?)/);
       weightKg = weightMatch ? parseFloat(weightMatch[1]) : 0;
       
-      // Height in cm
+      // Height in cm - use default if missing
       const heightMatch = height.match(/(\d+(?:\.\d+)?)/);
-      if (!heightMatch) return 'N/A';
-      const heightCm = parseFloat(heightMatch[1]);
+      let heightCm: number;
+      if (!heightMatch || !heightMatch[1]) {
+        // Use gender-specific default
+        heightCm = gender === 'female' ? 162 : 175;
+      } else {
+        heightCm = parseFloat(heightMatch[1]);
+      }
       heightMeters = heightCm / 100;
     } else {
       // Imperial: weight in lbs, height in feet'inches"
@@ -28,13 +38,17 @@ const calculateBMI = (weight: string, height: string, units: 'metric' | 'imperia
       const weightLbs = weightMatch ? parseFloat(weightMatch[1]) : 0;
       weightKg = weightLbs * 0.453592;
       
-      // Extract height in feet and inches
+      // Extract height in feet and inches - use default if missing
       const heightMatch = height.match(/(\d+)'(\d+)?/);
-      if (!heightMatch) return 'N/A';
-      
-      const feet = parseInt(heightMatch[1]);
-      const inches = parseInt(heightMatch[2] || '0');
-      const totalInches = feet * 12 + inches;
+      let totalInches: number;
+      if (!heightMatch) {
+        // Use gender-specific default
+        totalInches = gender === 'female' ? 64 : 69; // 5'4" = 64", 5'9" = 69"
+      } else {
+        const feet = parseInt(heightMatch[1]);
+        const inches = parseInt(heightMatch[2] || '0');
+        totalInches = feet * 12 + inches;
+      }
       heightMeters = totalInches * 0.0254;
     }
     
@@ -174,7 +188,9 @@ export default function ProfileButton({ top, right }: ProfileButtonProps) {
                     <View style={styles.profileCard}>
                       <Text style={styles.profileLabel}>BMI</Text>
                       <View style={styles.profileValueRow}>
-                        <Text style={styles.profileValue}>{calculateBMI(profile.weight, profile.height, units)}</Text>
+                        <Text style={styles.profileValue}>
+                          {calculateBMI(profile.weight, profile.height, units, profile.gender)}
+                        </Text>
                         <Text style={styles.profileUnit}>kg/m²</Text>
                       </View>
                     </View>

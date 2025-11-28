@@ -17,7 +17,8 @@
         "LSApplicationQueriesSchemes": [
           "https",
           "http"
-        ]
+        ],
+        "NSLocationWhenInUseUsageDescription": "SideTrack uses your location to show you local rankings and compare your strength with people in your area."
       }
     },
     "android": {
@@ -54,7 +55,13 @@
       [
         "expo-apple-authentication"
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SideTrack uses your location to show you local rankings and compare your strength with people in your area."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

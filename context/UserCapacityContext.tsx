@@ -2,12 +2,16 @@ import { calculateStrengthScore, calculateWilksScore, getCoreLiftPRs } from '@/c
 import {
   getAllExerciseLimits,
   getProfile,
+  getPreference,
+  setPreference,
   getWorkoutLogs,
   saveAllExerciseLimits,
   saveExerciseLimit,
 } from '@/lib/database';
+import { invalidateCache } from '@/lib/leaderboardCache';
 import { supabase } from '@/lib/supabase';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { generateUsername, generateUsernameFromProfile } from '@/helper/username';
+import React, { createContext, ReactNode, useContext, useEffect, useState, useRef } from 'react';
 // import { useAuth } from './AuthContext'; // OLD: Custom OAuth
 import { useSupabaseAuth } from './SupabaseAuthContext'; // NEW: Supabase Auth
 
@@ -78,16 +82,50 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
   const [isLoading, setIsLoading] = useState(true);
   // const { user } = useAuth(); // OLD
   const { user } = useSupabaseAuth(); // NEW
+  
+  // Debounce timer ref - batches multiple rapid updates into a single sync
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSyncRef = useRef(false);
 
   // Load capacity limits when component mounts or user changes
   useEffect(() => {
     loadCapacityLimits();
   }, [user]);
 
-  // Sync strength score to Supabase whenever capacity limits change
+  // Debounced sync strength score to Supabase whenever capacity limits change
+  // This batches multiple updates (even longer sequences) into a single API call
+  // Debounce duration is configurable via EXPO_PUBLIC_SYNC_DEBOUNCE_MS env variable
+  // Default: 10 seconds - batches all updates within 10 seconds into one API call
   useEffect(() => {
     if (user && !isLoading) {
-      syncStrengthToSupabase();
+      // Clear any pending sync
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+      
+      // Set flag that we have pending changes
+      pendingSyncRef.current = true;
+      
+      // Debounce: wait for configured duration after last change before syncing
+      // This batches multiple updates (even longer sequences) into a single Supabase call
+      // Set EXPO_PUBLIC_SYNC_DEBOUNCE_MS in your .env file to customize
+      // Example: EXPO_PUBLIC_SYNC_DEBOUNCE_MS=15000 (15 seconds)
+      const debounceMs = process.env.EXPO_PUBLIC_SYNC_DEBOUNCE_MS
+        ? parseInt(process.env.EXPO_PUBLIC_SYNC_DEBOUNCE_MS, 10)
+        : 10 * 1000; // Default: 10 seconds
+      
+      syncTimeoutRef.current = setTimeout(() => {
+        if (pendingSyncRef.current) {
+          syncStrengthToSupabase();
+          pendingSyncRef.current = false;
+        }
+      }, debounceMs);
+      
+      return () => {
+        if (syncTimeoutRef.current) {
+          clearTimeout(syncTimeoutRef.current);
+        }
+      };
     }
   }, [capacityLimits, user, isLoading]);
 
@@ -107,6 +145,14 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
       const gender = profile?.gender?.toLowerCase();
       const validGender = gender === 'male' || gender === 'female' ? gender : null;
 
+      // Get username from preferences (generated during onboarding)
+      // If no username exists, generate one from profile data (for existing users who completed onboarding before this feature)
+      let username = await getPreference<string>('username', null);
+      if (!username) {
+        username = generateUsernameFromProfile(validGender, bodyweight, user.id);
+        await setPreference('username', username);
+      }
+
       // Calculate Wilks score if we have bodyweight and valid gender
       const wilksScore = bodyweight && validGender
         ? calculateWilksScore(totalScore, bodyweight, validGender)
@@ -120,6 +166,7 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
         .from('user_strength')
         .upsert({
           user_id: user.id,
+          username: username,
           total_score: totalScore,
           wilks_score: wilksScore,
           bodyweight_lbs: bodyweight,
@@ -132,6 +179,8 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
         console.error('Failed to sync strength score:', error);
       } else {
         console.log('✅ Strength score synced:', totalScore, 'lbs (Wilks:', wilksScore, ')');
+        // Invalidate leaderboard cache so user sees their updated rank when they visit leaderboard
+        invalidateCache();
       }
     } catch (err) {
       console.error('Error syncing strength:', err);

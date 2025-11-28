@@ -1,7 +1,10 @@
 import { useProfile } from '@/context/ProfileContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useUserCapacity } from '@/context/UserCapacityContext';
-import { setOnboardingComplete } from '@/lib/onboarding';
+import { generateUniqueUsername, generateUsernameFromProfile, isUsernameAvailable, isValidUsername } from '@/helper/username';
 import { saveProfile, setPreference } from '@/lib/database';
+import { setOnboardingComplete } from '@/lib/onboarding';
+import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Dimensions, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -26,14 +29,65 @@ export default function OnboardingScreen() {
   const [heightFeet, setHeightFeet] = useState('');
   const [heightInches, setHeightInches] = useState('');
   const [heightCm, setHeightCm] = useState('');
+  const [username, setUsername] = useState('');
+  const [suggestedUsername, setSuggestedUsername] = useState('');
+  const [usernameAttempts, setUsernameAttempts] = useState(0);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>(null);
   const [loading, setLoading] = useState(false);
 
+  const MAX_USERNAME_ATTEMPTS = 5;
+
   const { updateFullProfile } = useProfile();
   const { capacityLimits, updateCapacityLimit } = useUserCapacity();
+  const { user } = useSupabaseAuth();
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step < 5) {
+      // Generate suggested username when moving from step 2 to step 3 (username step)
+      if (step === 2 && weight && gender) {
+        try {
+          const bodyweight = parseFloat(weight.match(/(\d+\.?\d*)/)?.[1] || '0');
+          // Generate a unique suggested username
+          const suggested = await generateUniqueUsername(
+            gender.toLowerCase(),
+            bodyweight,
+            user?.id
+          );
+          setSuggestedUsername(suggested);
+          // Pre-fill username with suggested if empty
+          if (!username) {
+            setUsername(suggested);
+          }
+          // Reset attempts when entering username step
+          setUsernameAttempts(0);
+          setUsernameError(null);
+        } catch (error) {
+          console.error('Error generating suggested username:', error);
+          // Fallback to simple generation if async fails
+          const bodyweight = parseFloat(weight.match(/(\d+\.?\d*)/)?.[1] || '0');
+          const suggested = generateUsernameFromProfile(
+            gender.toLowerCase(),
+            bodyweight,
+            user?.id
+          );
+          setSuggestedUsername(suggested);
+          if (!username) {
+            setUsername(suggested);
+          }
+        }
+      }
+      
+      // If moving from username step, check availability first
+      if (step === 3) {
+        await handleUsernameCheck();
+        // Only proceed if username is valid and available, or max attempts reached
+        if (!canProceed()) {
+          return; // Don't advance if validation fails
+        }
+      }
+      
       setStep(step + 1);
     }
   };
@@ -50,25 +104,76 @@ export default function OnboardingScreen() {
       // Save units preference
       await setPreference('units', units);
 
-      // Format height based on units
+      // Save profile
+      const profileWeight = weight || (units === 'imperial' ? '170' : '77');
+      const profileGender = gender || 'male';
+      
+      // Format height based on units with gender-specific defaults
       let heightValue = '';
       if (units === 'imperial') {
-        const feet = heightFeet || '5';
-        const inches = heightInches || '9';
-        heightValue = `${feet}'${inches}"`;
+        if (heightFeet && heightInches) {
+          heightValue = `${heightFeet}'${heightInches}"`;
+        } else {
+          // Gender-specific defaults for imperial
+          if (profileGender === 'female') {
+            heightValue = `5'4"`; // Average female height
+          } else {
+            heightValue = `5'9"`; // Average male height
+          }
+        }
       } else {
-        heightValue = heightCm || '175';
+        if (heightCm) {
+          heightValue = heightCm;
+        } else {
+          // Gender-specific defaults for metric
+          if (profileGender === 'female') {
+            heightValue = '162'; // Average female height in cm
+          } else {
+            heightValue = '175'; // Average male height in cm
+          }
+        }
       }
-
-      // Save profile
       const profile = {
-        weight: weight || (units === 'imperial' ? '170' : '77'),
+        weight: profileWeight,
         height: heightValue,
         calorieGoal: '360',
-        gender: gender || 'male',
+        gender: profileGender,
       };
       await saveProfile(profile);
       await updateFullProfile(profile);
+      
+      // Use the username from the form (user has already set it in step 3)
+      // If max attempts reached, username should already be auto-generated
+      let finalUsername = username.trim();
+      if (!finalUsername || usernameAttempts >= MAX_USERNAME_ATTEMPTS) {
+        // Generate a unique username as fallback
+        finalUsername = await generateUniqueUsername(
+          profileGender.toLowerCase(),
+          parseFloat(profileWeight.match(/(\d+\.?\d*)/)?.[1] || '0'),
+          user?.id
+        );
+      }
+      
+      // Normalize username to lowercase for consistency (case-insensitive uniqueness)
+      finalUsername = finalUsername.toLowerCase();
+      
+      // Save username preference
+      await setPreference('username', finalUsername);
+      
+      // Sync username to Supabase user_strength table if user is available
+      if (user) {
+        try {
+          await supabase
+            .from('user_strength')
+            .upsert({
+              user_id: user.id,
+              username: finalUsername,
+            }, { onConflict: 'user_id' });
+        } catch (error) {
+          console.error('Error syncing username to Supabase:', error);
+          // Don't block onboarding if username sync fails
+        }
+      }
 
       // Adjust capacity limits based on experience level
       if (experienceLevel && experienceLevel !== 'intermediate') {
@@ -115,10 +220,63 @@ export default function OnboardingScreen() {
     switch (step) {
       case 1: return true; // Units - always can proceed
       case 2: return weight.trim() !== '' && gender !== null; // Weight & Gender required
-      case 3: return true; // Height optional
+      case 3: {
+        // Username required and valid, or max attempts reached (auto-generated)
+        if (usernameAttempts >= MAX_USERNAME_ATTEMPTS) {
+          return true; // Auto-generated username is ready
+        }
+        return username.trim() !== '' && isValidUsername(username.trim()) && !usernameError;
+      }
       case 4: return true; // Experience optional
       case 5: return true; // Review
       default: return false;
+    }
+  };
+
+  const handleUsernameCheck = async () => {
+    if (!username.trim()) {
+      setUsernameError('Username is required');
+      return;
+    }
+
+    if (!isValidUsername(username.trim())) {
+      setUsernameError('Invalid username format. Must be 3-30 characters, alphanumeric with hyphens/underscores only.');
+      return;
+    }
+
+    setIsCheckingUsername(true);
+    setUsernameError(null);
+
+    try {
+      const isAvailable = await isUsernameAvailable(username.trim(), user?.id);
+      
+      if (isAvailable) {
+        setUsernameError(null);
+        // Username is available, can proceed
+      } else {
+        const newAttempts = usernameAttempts + 1;
+        setUsernameAttempts(newAttempts);
+
+        if (newAttempts >= MAX_USERNAME_ATTEMPTS) {
+          // Auto-generate a unique username
+          const bodyweight = parseFloat(weight.match(/(\d+\.?\d*)/)?.[1] || '0');
+          const autoUsername = await generateUniqueUsername(
+            gender?.toLowerCase() || null,
+            bodyweight,
+            user?.id
+          );
+          setUsername(autoUsername);
+          setSuggestedUsername(autoUsername);
+          setUsernameError('Maximum attempts reached. A unique username has been generated for you.');
+        } else {
+          setUsernameError(`Username is already taken. ${MAX_USERNAME_ATTEMPTS - newAttempts} attempts remaining.`);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking username:', error);
+      setUsernameError('Error checking username availability. Please try again.');
+    } finally {
+      setIsCheckingUsername(false);
     }
   };
 
@@ -175,6 +333,42 @@ export default function OnboardingScreen() {
             </View>
 
             <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Height (Optional)</Text>
+              {units === 'imperial' ? (
+                <View style={styles.heightRow}>
+                  <View style={styles.heightInputGroup}>
+                    <Text style={styles.inputLabel}>Feet</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={heightFeet}
+                      onChangeText={setHeightFeet}
+                      placeholder="5"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.heightInputGroup}>
+                    <Text style={styles.inputLabel}>Inches</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={heightInches}
+                      onChangeText={setHeightInches}
+                      placeholder="9"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  value={heightCm}
+                  onChangeText={setHeightCm}
+                  placeholder="175"
+                  keyboardType="numeric"
+                />
+              )}
+            </View>
+
+            <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Gender</Text>
               <View style={styles.genderContainer}>
                 <TouchableOpacity
@@ -201,48 +395,75 @@ export default function OnboardingScreen() {
       case 3:
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Height (Optional)</Text>
+            <Text style={styles.stepTitle}>Choose Your Username</Text>
             <Text style={styles.stepDescription}>
-              Help us calculate your BMI and calorie needs
+              This will be displayed on the leaderboard. You can customize it or use our suggestion.
             </Text>
             
-            {units === 'imperial' ? (
-              <View style={styles.heightRow}>
-                <View style={styles.heightInputGroup}>
-                  <Text style={styles.inputLabel}>Feet</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={heightFeet}
-                    onChangeText={setHeightFeet}
-                    placeholder="5"
-                    keyboardType="numeric"
-                    autoFocus
-                  />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Username</Text>
+              <TextInput
+                style={[styles.input, usernameError && styles.inputError]}
+                value={username}
+                onChangeText={(text) => {
+                  // Remove spaces and convert to valid format
+                  const cleaned = text.trim().replace(/\s+/g, '-');
+                  setUsername(cleaned);
+                  setUsernameError(null); // Clear error on input
+                }}
+                placeholder={suggestedUsername || 'Enter username'}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+                editable={usernameAttempts < MAX_USERNAME_ATTEMPTS}
+              />
+              {suggestedUsername && usernameAttempts < MAX_USERNAME_ATTEMPTS && (
+                <TouchableOpacity
+                  style={styles.suggestButton}
+                  onPress={async () => {
+                    const isAvailable = await isUsernameAvailable(suggestedUsername, user?.id);
+                    if (isAvailable) {
+                      setUsername(suggestedUsername);
+                      setUsernameError(null);
+                    } else {
+                      // Generate a new unique suggestion
+                      const bodyweight = parseFloat(weight.match(/(\d+\.?\d*)/)?.[1] || '0');
+                      const unique = await generateUniqueUsername(
+                        gender?.toLowerCase() || null,
+                        bodyweight,
+                        user?.id
+                      );
+                      setSuggestedUsername(unique);
+                      setUsername(unique);
+                    }
+                  }}
+                >
+                  <Text style={styles.suggestButtonText}>
+                    Use suggested: {suggestedUsername}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {username && !isValidUsername(username) && (
+                <Text style={styles.errorText}>
+                  Username must be 3-30 characters, alphanumeric with hyphens/underscores only
+                </Text>
+              )}
+              {usernameError && (
+                <Text style={styles.errorText}>{usernameError}</Text>
+              )}
+              {usernameAttempts >= MAX_USERNAME_ATTEMPTS && (
+                <View style={styles.attemptsWarning}>
+                  <Text style={styles.attemptsWarningText}>
+                    Maximum attempts reached. A username has been auto-generated for you.
+                  </Text>
                 </View>
-                <View style={styles.heightInputGroup}>
-                  <Text style={styles.inputLabel}>Inches</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={heightInches}
-                    onChangeText={setHeightInches}
-                    placeholder="9"
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-            ) : (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Height (cm)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={heightCm}
-                  onChangeText={setHeightCm}
-                  placeholder="175"
-                  keyboardType="numeric"
-                  autoFocus
-                />
-              </View>
-            )}
+              )}
+              {usernameAttempts > 0 && usernameAttempts < MAX_USERNAME_ATTEMPTS && (
+                <Text style={styles.attemptsText}>
+                  Attempts remaining: {MAX_USERNAME_ATTEMPTS - usernameAttempts}
+                </Text>
+              )}
+            </View>
           </View>
         );
 
@@ -303,6 +524,10 @@ export default function OnboardingScreen() {
             </Text>
             
             <View style={styles.reviewContainer}>
+              <View style={styles.reviewRow}>
+                <Text style={styles.reviewLabel}>Username:</Text>
+                <Text style={styles.reviewValue}>{username || 'Not set'}</Text>
+              </View>
               <View style={styles.reviewRow}>
                 <Text style={styles.reviewLabel}>Units:</Text>
                 <Text style={styles.reviewValue}>{units === 'imperial' ? 'Imperial' : 'Metric'}</Text>
@@ -480,6 +705,49 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 8,
+  },
+  suggestButton: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#F2F2F7',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  suggestButtonText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#FF3B30',
+    marginTop: 6,
+  },
+  attemptsText: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 8,
+    fontWeight: '600',
+  },
+  attemptsWarning: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFF3CD',
+    borderWidth: 1,
+    borderColor: '#FFC107',
+  },
+  attemptsWarningText: {
+    fontSize: 13,
+    color: '#856404',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  inputError: {
+    borderColor: '#FF3B30',
+    borderWidth: 2,
   },
   input: {
     fontSize: 17,

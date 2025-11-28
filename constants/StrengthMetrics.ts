@@ -22,9 +22,10 @@ export type CoreLift = typeof CORE_LIFTS[number];
  * This is the primary metric for ranking users
  */
 export function calculateStrengthScore(capacityLimits: Record<string, number>): number {
-  return CORE_LIFTS.reduce((total, lift) => {
-    return total + (capacityLimits[lift] || 0);
+  const total = CORE_LIFTS.reduce((sum, lift) => {
+    return sum + (capacityLimits[lift] || 0);
   }, 0);
+  return Math.round(total);
 }
 
 /**
@@ -78,17 +79,22 @@ export function calculateWilksScore(
 
 /**
  * Get individual lift PRs from capacity limits
+ * Values are rounded to integers to match database schema
  */
 export function getCoreLiftPRs(capacityLimits: Record<string, number>) {
+  const roundOrNull = (value: number | undefined): number | null => {
+    return value ? Math.round(value) : null;
+  };
+
   return {
-    squat_1rm: capacityLimits['Squat'] || null,
-    deadlift_1rm: capacityLimits['Deadlift'] || null,
-    bench_press_1rm: capacityLimits['Bench Press'] || null,
-    overhead_press_1rm: capacityLimits['Overhead Press'] || null,
-    pull_up_1rm: capacityLimits['Pull-Up'] || null,
-    barbell_row_1rm: capacityLimits['Barbell Row'] || null,
-    dumbbell_lunge_1rm: capacityLimits['Dumbbell Lunge'] || null,
-    push_up_1rm: capacityLimits['Push-Up'] || null,
-    triceps_dip_1rm: capacityLimits['Triceps Dip'] || null,
+    squat_1rm: roundOrNull(capacityLimits['Squat']),
+    deadlift_1rm: roundOrNull(capacityLimits['Deadlift']),
+    bench_press_1rm: roundOrNull(capacityLimits['Bench Press']),
+    overhead_press_1rm: roundOrNull(capacityLimits['Overhead Press']),
+    pull_up_1rm: roundOrNull(capacityLimits['Pull-Up']),
+    barbell_row_1rm: roundOrNull(capacityLimits['Barbell Row']),
+    dumbbell_lunge_1rm: roundOrNull(capacityLimits['Dumbbell Lunge']),
+    push_up_1rm: roundOrNull(capacityLimits['Push-Up']),
+    triceps_dip_1rm: roundOrNull(capacityLimits['Triceps Dip']),
   };
 }

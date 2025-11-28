@@ -1,12 +1,36 @@
 import { PreferenceRow, SegmentedControl } from '@/components/SettingsComponents';
+import { useProfile } from '@/context/ProfileContext';
 import { usePreferences } from '@/hooks/usePreferences';
+import { convertHeight, convertWeight } from '@/lib/unitConversions';
 import { Stack, useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function GeneralSettingsScreen() {
   const { preferences, updatePreference } = usePreferences();
+  const { profile, updateFullProfile } = useProfile();
   const router = useRouter();
+
+  const handleUnitsChange = async (newUnits: 'metric' | 'imperial') => {
+    const oldUnits = preferences.units;
+    
+    // Only convert if units are actually changing
+    if (oldUnits !== newUnits && profile.weight && profile.height) {
+      // Convert weight and height values
+      const convertedWeight = convertWeight(profile.weight, oldUnits, newUnits);
+      const convertedHeight = convertHeight(profile.height, oldUnits, newUnits);
+      
+      // Update profile with converted values (use updateFullProfile to avoid race condition)
+      await updateFullProfile({
+        ...profile,
+        weight: convertedWeight,
+        height: convertedHeight,
+      });
+    }
+    
+    // Update the units preference
+    updatePreference('units', newUnits);
+  };
 
   return (
     <View style={styles.container}>
@@ -30,7 +54,7 @@ export default function GeneralSettingsScreen() {
               { label: 'Metric', value: 'metric' },
             ]}
             selectedValue={preferences.units}
-            onValueChange={(value) => updatePreference('units', value as 'metric' | 'imperial')}
+            onValueChange={(value) => handleUnitsChange(value as 'metric' | 'imperial')}
           />
 
           <PreferenceRow

@@ -21,6 +21,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
+          username: string | null;
           total_score: number;
           wilks_score: number | null;
           bodyweight_lbs: number | null;
@@ -39,6 +40,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
+          username?: string | null;
           total_score: number;
           wilks_score?: number | null;
           bodyweight_lbs?: number | null;
@@ -55,6 +57,7 @@ export type Database = {
           triceps_dip_1rm?: number | null;
         };
         Update: {
+          username?: string | null;
           total_score?: number;
           wilks_score?: number | null;
           bodyweight_lbs?: number | null;
