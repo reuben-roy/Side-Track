@@ -92,6 +92,30 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="leaderboard"
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.tabContainer}>
+              {focused ? (
+                <LinearGradient
+                  colors={['#c3e5ecff', '#d9f1f6ff']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.activeTab}
+                >
+                  <IconSymbol size={wp('6%')} name="trophy.fill" color="#181C20" />
+                  <Text style={styles.activeLabel}>Rankings</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.inactiveTab}>
+                  <IconSymbol size={wp('6%')} name="trophy.fill" color="#999" />
+                </View>
+              )}
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="preferences"
         options={{
           tabBarIcon: ({ color, focused }) => (
@@ -129,10 +153,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: wp('5%'),
+    paddingHorizontal: wp('3%'),
     paddingVertical: hp('1.2%'),
     borderRadius: 24,
-    minWidth: wp('28%'),
+    minWidth: wp('24%'),
     shadowColor: '#E6B3B3',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -142,13 +166,13 @@ const styles = StyleSheet.create({
   activeLabel: {
     color: '#181C20',
     fontWeight: '700',
-    fontSize: wp('4%'),
-    marginLeft: wp('2%'),
+    fontSize: wp('3.5%'),
+    marginLeft: wp('1.5%'),
   },
   inactiveTab: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: wp('4%'),
+    paddingHorizontal: wp('2%'),
     paddingVertical: hp('1.2%'),
   },
 });

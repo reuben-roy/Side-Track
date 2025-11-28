@@ -167,7 +167,6 @@ export default function HomeScreen() {
 
       {/* Title Section */}
       <View style={styles.titleContainer}>
-      <Text style={styles.title}>Spin the wheel to pick your workout!</Text>
       </View>
 
       {/* Main Content */}
@@ -380,7 +379,7 @@ const styles = StyleSheet.create({
   buttonsColumn: {
     flex: 2,
     justifyContent: 'flex-end',
-    gap: 16,
+    gap: 10,
   },
   slotLabel: {
     fontSize: 12,

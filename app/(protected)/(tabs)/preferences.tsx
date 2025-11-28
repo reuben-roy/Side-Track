@@ -65,6 +65,7 @@ export default function PreferencesScreen() {
           />
         </View>
 
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Data & Storage</Text>
           <SettingsItem 

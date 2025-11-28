@@ -1,9 +1,12 @@
+import { calculateStrengthScore, calculateWilksScore, getCoreLiftPRs } from '@/constants/StrengthMetrics';
 import {
-    getAllExerciseLimits,
-    getWorkoutLogs,
-    saveAllExerciseLimits,
-    saveExerciseLimit,
+  getAllExerciseLimits,
+  getProfile,
+  getWorkoutLogs,
+  saveAllExerciseLimits,
+  saveExerciseLimit,
 } from '@/lib/database';
+import { supabase } from '@/lib/supabase';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 // import { useAuth } from './AuthContext'; // OLD: Custom OAuth
 import { useSupabaseAuth } from './SupabaseAuthContext'; // NEW: Supabase Auth
@@ -80,6 +83,60 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
   useEffect(() => {
     loadCapacityLimits();
   }, [user]);
+
+  // Sync strength score to Supabase whenever capacity limits change
+  useEffect(() => {
+    if (user && !isLoading) {
+      syncStrengthToSupabase();
+    }
+  }, [capacityLimits, user, isLoading]);
+
+  const syncStrengthToSupabase = async () => {
+    if (!user) return;
+
+    try {
+      const profile = await getProfile();
+      const totalScore = calculateStrengthScore(capacityLimits);
+
+      // Extract bodyweight from profile (handles formats like "170" or "170 lbs")
+      const bodyweight = profile?.weight 
+        ? parseFloat(profile.weight.match(/(\d+\.?\d*)/)?.[1] || '0')
+        : null;
+
+      // Extract gender (normalize to lowercase)
+      const gender = profile?.gender?.toLowerCase();
+      const validGender = gender === 'male' || gender === 'female' ? gender : null;
+
+      // Calculate Wilks score if we have bodyweight and valid gender
+      const wilksScore = bodyweight && validGender
+        ? calculateWilksScore(totalScore, bodyweight, validGender)
+        : null;
+
+      // Get individual lift PRs
+      const liftPRs = getCoreLiftPRs(capacityLimits);
+
+      // Upsert to Supabase (use user_id for conflict resolution since it has the unique constraint)
+      const { error } = await supabase
+        .from('user_strength')
+        .upsert({
+          user_id: user.id,
+          total_score: totalScore,
+          wilks_score: wilksScore,
+          bodyweight_lbs: bodyweight,
+          gender: validGender,
+          ...liftPRs,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+
+      if (error) {
+        console.error('Failed to sync strength score:', error);
+      } else {
+        console.log('✅ Strength score synced:', totalScore, 'lbs (Wilks:', wilksScore, ')');
+      }
+    } catch (err) {
+      console.error('Error syncing strength:', err);
+    }
+  };
 
   const loadCapacityLimits = async () => {
     setIsLoading(true);

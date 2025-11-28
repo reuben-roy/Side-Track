@@ -1,3 +1,4 @@
+import { usePreferences } from '@/hooks/usePreferences';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -18,22 +19,32 @@ export default function ProfileInputField({
   onSave, 
   onCancel 
 }: ProfileInputFieldProps) {
+  const { preferences } = usePreferences();
+  const units = preferences.units || 'imperial';
   const [inputValue, setInputValue] = useState('');
   const [heightFeet, setHeightFeet] = useState('');
   const [heightInches, setHeightInches] = useState('');
+  const [heightCm, setHeightCm] = useState('');
   const [genderDropdownVisible, setGenderDropdownVisible] = useState(false);
 
   useEffect(() => {
     if (inputType === 'height') {
-      const match = value.match(/(\d+)'(\d+)?/);
-      setHeightFeet(match ? match[1] : '');
-      setHeightInches(match && match[2] ? match[2] : '');
+      if (units === 'metric') {
+        // Metric: just a number in cm
+        const match = value.match(/(\d+(?:\.\d+)?)/);
+        setHeightCm(match ? match[1] : '');
+      } else {
+        // Imperial: feet'inches"
+        const match = value.match(/(\d+)'(\d+)?/);
+        setHeightFeet(match ? match[1] : '');
+        setHeightInches(match && match[2] ? match[2] : '');
+      }
     } else if (inputType === 'gender') {
       setGenderDropdownVisible(true);
     } else {
       setInputValue(value);
     }
-  }, [value, inputType]);
+  }, [value, inputType, units]);
 
   const handleGenderSelect = async (gender: string) => {
     await onSave(gender);
@@ -42,10 +53,17 @@ export default function ProfileInputField({
 
   const handleSave = async () => {
     if (inputType === 'height') {
-      const feet = heightFeet.replace(/[^0-9]/g, '');
-      const inches = heightInches.replace(/[^0-9]/g, '');
-      const formatted = `${feet}'${inches}\"`;
-      await onSave(formatted);
+      if (units === 'metric') {
+        // Metric: save as cm
+        const cm = heightCm.replace(/[^0-9.]/g, '');
+        await onSave(cm || '175');
+      } else {
+        // Imperial: save as feet'inches"
+        const feet = heightFeet.replace(/[^0-9]/g, '');
+        const inches = heightInches.replace(/[^0-9]/g, '');
+        const formatted = `${feet}'${inches}\"`;
+        await onSave(formatted);
+      }
     } else {
       await onSave(inputValue);
     }
@@ -54,29 +72,45 @@ export default function ProfileInputField({
   const renderInput = () => {
     switch (inputType) {
       case 'height':
-        return (
-          <View style={styles.heightInputs}>
-            <TextInput
-              style={[styles.input, { width: 60 }]}
-              value={heightFeet}
-              onChangeText={setHeightFeet}
-              keyboardType="numeric"
-              placeholder="ft"
-              maxLength={2}
-              autoFocus
-            />
-            <Text style={styles.inputLabel}>ft</Text>
-            <TextInput
-              style={[styles.input, { width: 60 }]}
-              value={heightInches}
-              onChangeText={setHeightInches}
-              keyboardType="numeric"
-              placeholder="in"
-              maxLength={2}
-            />
-            <Text style={styles.inputLabel}>inch</Text>
-          </View>
-        );
+        if (units === 'metric') {
+          return (
+            <View style={styles.heightInputs}>
+              <TextInput
+                style={styles.input}
+                value={heightCm}
+                onChangeText={setHeightCm}
+                keyboardType="numeric"
+                placeholder="175"
+                autoFocus
+              />
+              <Text style={styles.inputLabel}>cm</Text>
+            </View>
+          );
+        } else {
+          return (
+            <View style={styles.heightInputs}>
+              <TextInput
+                style={[styles.input, { width: 60 }]}
+                value={heightFeet}
+                onChangeText={setHeightFeet}
+                keyboardType="numeric"
+                placeholder="5"
+                maxLength={2}
+                autoFocus
+              />
+              <Text style={styles.inputLabel}>ft</Text>
+              <TextInput
+                style={[styles.input, { width: 60 }]}
+                value={heightInches}
+                onChangeText={setHeightInches}
+                keyboardType="numeric"
+                placeholder="9"
+                maxLength={2}
+              />
+              <Text style={styles.inputLabel}>in</Text>
+            </View>
+          );
+        }
       case 'gender':
         return genderDropdownVisible ? (
           <View style={styles.genderOptions}>

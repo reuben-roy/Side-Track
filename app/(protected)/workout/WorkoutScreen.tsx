@@ -2,10 +2,10 @@ import SlotPicker from '@/components/SlotPicker';
 import { useProfile } from '@/context/ProfileContext';
 import { useUserCapacity } from '@/context/UserCapacityContext';
 import {
-    addWorkoutLog,
-    getExerciseStats as getDBExerciseStats,
-    getMuscleCapacity,
-    updateAllMuscleCapacity,
+  addWorkoutLog,
+  getExerciseStats as getDBExerciseStats,
+  getMuscleCapacity,
+  updateAllMuscleCapacity,
 } from '@/lib/database';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -296,8 +296,8 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       <TouchableOpacity style={styles.close} onPress={onClose}>
         <Text style={{ fontSize: 32, color: '#181C20' }}>×</Text>
       </TouchableOpacity>
-      <Text style={styles.header}>Log Workout</Text>
-      <Text style={styles.exerciseName}>{exercise}</Text>
+      <Text style={styles.header}>{exercise}Log Workout</Text>
+      <Text style={styles.exerciseName}>Log Workout</Text>
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
@@ -511,10 +511,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '800',
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: 20,
     marginBottom: 4,
     color: '#000000',
     letterSpacing: -0.5,

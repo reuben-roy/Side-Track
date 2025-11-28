@@ -1,26 +1,42 @@
 // import { useAuth } from '@/context/AuthContext'; // OLD: Custom OAuth
 import { FIELDS, ProfileKeys, useProfile } from '@/context/ProfileContext';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext'; // NEW: Supabase Auth
+import { usePreferences } from '@/hooks/usePreferences';
 import React, { useState } from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ProfileInputField, { InputType } from './ProfileInputField';
 
-// BMI calculation function
-const calculateBMI = (weight: string, height: string): string => {
+// BMI calculation function - handles both metric and imperial
+const calculateBMI = (weight: string, height: string, units: 'metric' | 'imperial'): string => {
   try {
-    // Extract weight in pounds
-    const weightMatch = weight.match(/(\d+(?:\.\d+)?)/);
-    const weightLbs = weightMatch ? parseFloat(weightMatch[1]) : 0;
-    
-    // Extract height in feet and inches
-    const heightMatch = height.match(/(\d+)'(\d+)?/);
-    if (!heightMatch) return 'N/A';
-    
-    const feet = parseInt(heightMatch[1]);
-    const inches = parseInt(heightMatch[2] || '0');
-    const totalInches = feet * 12 + inches;
-    const heightMeters = totalInches * 0.0254;
-    const weightKg = weightLbs * 0.453592;
+    let weightKg: number;
+    let heightMeters: number;
+
+    if (units === 'metric') {
+      // Metric: weight in kg, height in cm
+      const weightMatch = weight.match(/(\d+(?:\.\d+)?)/);
+      weightKg = weightMatch ? parseFloat(weightMatch[1]) : 0;
+      
+      // Height in cm
+      const heightMatch = height.match(/(\d+(?:\.\d+)?)/);
+      if (!heightMatch) return 'N/A';
+      const heightCm = parseFloat(heightMatch[1]);
+      heightMeters = heightCm / 100;
+    } else {
+      // Imperial: weight in lbs, height in feet'inches"
+      const weightMatch = weight.match(/(\d+(?:\.\d+)?)/);
+      const weightLbs = weightMatch ? parseFloat(weightMatch[1]) : 0;
+      weightKg = weightLbs * 0.453592;
+      
+      // Extract height in feet and inches
+      const heightMatch = height.match(/(\d+)'(\d+)?/);
+      if (!heightMatch) return 'N/A';
+      
+      const feet = parseInt(heightMatch[1]);
+      const inches = parseInt(heightMatch[2] || '0');
+      const totalInches = feet * 12 + inches;
+      heightMeters = totalInches * 0.0254;
+    }
     
     if (heightMeters <= 0 || weightKg <= 0) return 'N/A';
     
@@ -40,10 +56,13 @@ export default function ProfileButton({ top, right }: ProfileButtonProps) {
   // const auth = useAuth(); // OLD
   const auth = useSupabaseAuth(); // NEW
   const { profile, updateProfile } = useProfile();
+  const { preferences } = usePreferences();
   // const { user, logout } = auth || {}; // OLD
   const { user, signOut } = auth || {}; // NEW: signOut instead of logout
   const [modalVisible, setModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<ProfileKeys | null>(null);
+  
+  const units = preferences.units || 'imperial';
 
   const getInputType = (fieldKey: ProfileKeys): InputType => {
     switch (fieldKey) {
@@ -127,12 +146,15 @@ export default function ProfileButton({ top, right }: ProfileButtonProps) {
                       <Text style={styles.profileLabel}>Weight</Text>
                       <View style={styles.profileValueRow}>
                         <Text style={styles.profileValue}>{profile.weight}</Text>
-                        <Text style={styles.profileUnit}>lb</Text>
+                        <Text style={styles.profileUnit}>{units === 'metric' ? 'kg' : 'lb'}</Text>
                       </View>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.profileCard} onPress={() => openEdit('height')}>
                       <Text style={styles.profileLabel}>Height</Text>
-                      <Text style={styles.profileValue}>{profile.height}</Text>
+                      <View style={styles.profileValueRow}>
+                        <Text style={styles.profileValue}>{profile.height}</Text>
+                        {units === 'metric' && <Text style={styles.profileUnit}>cm</Text>}
+                      </View>
                     </TouchableOpacity>
                   </View>
                   <View style={styles.profileRow}>
@@ -152,7 +174,7 @@ export default function ProfileButton({ top, right }: ProfileButtonProps) {
                     <View style={styles.profileCard}>
                       <Text style={styles.profileLabel}>BMI</Text>
                       <View style={styles.profileValueRow}>
-                        <Text style={styles.profileValue}>{calculateBMI(profile.weight, profile.height)}</Text>
+                        <Text style={styles.profileValue}>{calculateBMI(profile.weight, profile.height, units)}</Text>
                         <Text style={styles.profileUnit}>kg/m²</Text>
                       </View>
                     </View>

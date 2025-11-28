@@ -1,7 +1,7 @@
 import { MuscleGroup } from '@/constants/MuscleGroups';
 import { getAllPreferences, setPreference } from '@/lib/database';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface DrainSettings {
   overallMultiplier: number;
@@ -71,6 +71,12 @@ export function usePreferences() {
     }
   }, []);
 
+  // Load preferences on initial mount
+  useEffect(() => {
+    loadPreferences();
+  }, [loadPreferences]);
+
+  // Also reload when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadPreferences();
