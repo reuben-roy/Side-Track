@@ -1,6 +1,6 @@
 import { exercises } from '@/constants/Exercises';
 import { useUserCapacity } from '@/context/UserCapacityContext';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -54,20 +54,17 @@ export default function ExerciseLimitsScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{ 
-          title: 'Exercise Limits',
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Text style={{ fontSize: 32, color: '#181C20', marginRight: 10 }}>×</Text>
-            </TouchableOpacity>
-          ),
-          headerBackVisible: false,
-        }} 
-      />
       <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+            <Text style={styles.closeButtonText}>×</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.headerContainer}>
+          <Text style={styles.header}>Exercise Limits</Text>
+          <Text style={styles.headerSubtitle}>Set your estimated 1-rep max for each exercise</Text>
+        </View>
         <View style={styles.section}>
-          <Text style={styles.sectionSubtitle}>Set your estimated 1-rep max for each exercise</Text>
 
           <View style={styles.recoveryRatesContainer}>
             <Text style={styles.recoveryGroupTitle}>Personalized Exercise Limits</Text>
@@ -152,16 +149,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   content: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  headerRow: {
+    paddingTop: 60,
+    marginBottom: 16,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: -8,
+  },
+  closeButtonText: {
+    fontSize: 32,
+    color: '#181C20',
+  },
+  headerContainer: {
+    marginBottom: 24,
+  },
+  header: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#8E8E93',
+    letterSpacing: 0.3,
   },
   section: {
     marginBottom: 32,
-  },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginTop: 4,
-    marginBottom: 16,
   },
   recoveryRatesContainer: {
     backgroundColor: '#F2F2F7',

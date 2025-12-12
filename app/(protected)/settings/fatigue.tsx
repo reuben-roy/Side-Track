@@ -1,5 +1,5 @@
 import { DEFAULT_DRAIN_SETTINGS, DrainSettings, usePreferences } from '@/hooks/usePreferences';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -48,20 +48,17 @@ export default function FatigueSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{ 
-          title: 'Muscle Fatigue',
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Text style={{ fontSize: 32, color: '#181C20', marginRight: 10 }}>×</Text>
-            </TouchableOpacity>
-          ),
-          headerBackVisible: false,
-        }} 
-      />
       <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+            <Text style={styles.closeButtonText}>×</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.headerContainer}>
+          <Text style={styles.header}>Muscle Fatigue</Text>
+          <Text style={styles.headerSubtitle}>Control how quickly muscles get tired during workouts</Text>
+        </View>
         <View style={styles.section}>
-          <Text style={styles.sectionSubtitle}>Control how quickly muscles get tired during workouts</Text>
 
           {/* Main Fatigue Sensitivity Input */}
           <View style={styles.inputRow}>
@@ -228,16 +225,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   content: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  headerRow: {
+    paddingTop: 60,
+    marginBottom: 16,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: -8,
+  },
+  closeButtonText: {
+    fontSize: 32,
+    color: '#181C20',
+  },
+  headerContainer: {
+    marginBottom: 24,
+  },
+  header: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#8E8E93',
+    letterSpacing: 0.3,
   },
   section: {
     marginBottom: 32,
-  },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginTop: 4,
-    marginBottom: 16,
   },
   inputRow: {
     flexDirection: 'row',

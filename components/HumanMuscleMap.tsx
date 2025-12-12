@@ -7,125 +7,96 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Image, Path } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 
-// --- Configuration (Grouped for clarity) ---
+// --- Configuration ---
 const CONFIG = {
-  UNSELECTED_COLOR: '#E0E0E0', // Light gray for unselected muscles
-  SELECTED_COLOR: '#3498db',   // A clear, vibrant blue for selected muscles
-  STROKE_COLOR: '#2c3e50',     // Dark stroke for definition
-  STROKE_WIDTH: 1.5, // Changed to number for StyleSheet
+  UNSELECTED_COLOR: 'rgba(200, 200, 200, 0.0)', // Transparent when not selected
+  SELECTED_COLOR: '#FF6B6B',   // Vibrant coral red
+  STROKE_COLOR: 'rgba(0, 0, 0, 0.1)', 
+  STROKE_WIDTH: 1,
+  BODY_FILL_GRADIENT_START: '#DCDCDC',
+  BODY_FILL_GRADIENT_END: '#CFCFCF',
+  BODY_STROKE: '#999999',
+  BODY_DETAIL_STROKE: '#B0B0B0',
 };
 
-// --- Anatomical Data (Refactored with more realistic SVG paths) ---
-// The paths are now more complex, using curves to better represent muscle shapes.
-// Note: For multi-part muscles like 'abs', the 'path' property is now an array of strings.
-const MUSCLE_DATA = {
+// --- Anatomical Data - Matching new "Mannequin" SVGs ---
+const MUSCLE_DATA: any = {
   front: {
-    outline: 'M100 5 C 50 5, 45 40, 50 80 S 40 150, 60 220 S 70 350, 100 395 S 130 350, 140 220 S 160 150, 150 80 S 150 5, 100 5 Z',
     muscles: {
       chest: {
         name: 'Chest',
         path: [
-          // Left pectoralis major (15px left, 30px up)
-          'M50 60 C 40 65, 35 75, 33 85 C 31 95, 33 105, 37 110 C 41 115, 47 117, 53 115 C 59 113, 63 108, 65 105 C 67 102, 67 98, 65 95 C 63 92, 59 90, 55 88 C 51 86, 47 85, 50 60 Z',
-          // Right pectoralis major (15px right, 30px up)
-          'M100 60 C 110 65, 115 75, 117 85 C 119 95, 117 105, 113 110 C 109 115, 103 117, 97 115 C 91 113, 87 108, 85 105 C 83 102, 83 98, 85 95 C 87 92, 91 90, 95 88 C 99 86, 103 85, 100 60 Z',
-          // Sternum area (center line, unchanged)
-          'M73 60 L 77 60 L 77 110 L 73 110 Z'
+          'M74 55 L40 65 Q35 85 40 105 Q60 115 74 105 Z',
+          'M74 55 L108 65 Q113 85 108 105 Q88 115 74 105 Z',
         ]
       },
       abs: {
         name: 'Abs',
         path: [
-          // Top-left (unchanged)
-          'M53 120 C 51 120, 51 138, 53 138 H 65 C 67 138, 67 120, 65 120 Z',
-          // Top-right (5px left)
-          'M84 120 C 82 120, 82 138, 84 138 H 96 C 98 138, 98 120, 96 120 Z',
-          // Mid-left (unchanged)
-          'M53 140 C 51 140, 51 158, 53 158 H 65 C 67 158, 67 140, 65 140 Z',
-          // Mid-right (5px left)
-          'M84 140 C 82 140, 82 158, 84 158 H 96 C 98 158, 98 140, 96 140 Z',
-          // Low-left (unchanged)
-          'M53 160 C 51 160, 51 178, 53 178 H 65 C 67 178, 67 160, 65 160 Z',
-          // Low-right (5px left)
-          'M84 160 C 82 160, 82 178, 84 178 H 96 C 98 178, 98 160, 96 160 Z',
+          'M60 108 L88 108 L86 132 L62 132 Z', 
+          'M62 134 L86 134 L84 160 L64 160 Z', 
+          'M64 162 L84 162 L82 188 L66 188 Z',
         ]
       },
-      shoulders: { name: 'Shoulders', path: 'M15 65 C 0 75, 0 95, 17 100 L 40 75 C 35 65, 25 60, 15 65 Z M135 65 C 150 75, 150 95, 133 100 L 110 75 C 115 65, 125 60, 135 65 Z' },
+      shoulders: { 
+        name: 'Shoulders', 
+        path: [
+          'M40 65 Q30 68 25 68 Q12 75 12 95 L28 100 Q35 80 40 65 Z',
+          'M108 65 Q118 68 123 68 Q136 75 136 95 L120 100 Q113 80 108 65 Z',
+        ]
+      },
       biceps: {
         name: 'Biceps',
         path: [
-          // Left biceps (moved 20px left and 15px up)
-          'M10 95 Q20 90 30 95 Q35 105 35 120 Q35 135 30 145 Q25 150 20 150 Q15 150 10 145 Q5 135 5 120 Q5 105 10 95 Z',
-          // Right biceps (moved 20px right and 15px up)
-          'M120 95 Q130 90 140 95 Q145 105 145 120 Q145 135 140 145 Q135 150 130 150 Q125 150 120 145 Q115 135 115 120 Q115 105 120 95 Z'
+          'M12 95 Q10 115 12 140 L28 130 Q25 110 28 100 Z',
+          'M136 95 Q138 115 136 140 L120 130 Q123 110 120 100 Z',
         ]
       },
       quadriceps: {
         name: 'Quadriceps',
         path: [
-          // Left quadriceps (up 10px, 5px left)
-          'M45 210 Q60 208 67 215 Q70 225 70 240 Q70 255 67 265 Q63 270 60 270 Q53 270 45 265 Q40 255 40 240 Q40 225 45 210 Z',
-          // Right quadriceps (up 10px, 5px right)
-          'M83 210 Q98 208 105 215 Q108 225 108 240 Q108 255 105 265 Q101 270 98 270 Q91 270 83 265 Q78 255 78 240 Q78 225 83 210 Z',
-          // Muscle definition lines for left quad
-          'M48 215 L 48 260',
-          'M62 215 L 62 260',
-          // Muscle definition lines for right quad
-          'M86 215 L 86 260',
-          'M100 215 L 100 260'
+          'M38 200 Q35 240 40 280 L62 280 Q65 240 74 215 L68 210 Q50 200 38 200 Z',
+          'M110 200 Q113 240 108 280 L86 280 Q83 240 74 215 L80 210 Q98 200 110 200 Z',
         ]
       },
     },
   },
   back: {
-    outline: 'M100 5 C 50 5, 45 40, 50 80 S 40 150, 60 220 S 70 350, 100 395 S 130 350, 140 220 S 160 150, 150 80 S 150 5, 100 5 Z',
     muscles: {
-      traps: { name: 'Traps', path: 'M80 50 C 60 50, 60 80, 65 95 L 80 120 L 95 95 C 100 80, 100 50, 80 50 Z' },
+      traps: { 
+        name: 'Traps', 
+        path: 'M74 50 L98 65 L74 90 L50 65 Z'
+      },
       lats: {
-        name: 'Lats', path: [
-          // Left lat (25% smaller, centered)
-          'M34 100 Q48 88 62 91 Q76 94 79 112 Q81 129 74 143 Q62 155 47 152 Q32 147 29 132 Q26 117 29 111 Q29 108 33 105 Z',
-          // Right lat (25% smaller, centered)
-          'M79 112 Q81 94 95 91 Q109 88 123 100 Q127 103 127 108 Q130 117 127 132 Q124 147 109 152 Q94 155 82 143 Q75 129 77 112 Q75 94 79 112 Z',
-          // Muscle fiber definition (left, smaller)
-          'M33 111 Q47 99 61 115 Q73 126 73 141 Q70 152 61 155',
-          // Muscle fiber definition (right, smaller)
-          'M109 155 Q100 152 97 141 Q100 126 112 115 Q126 99 117 111',
-          // Inner edge detail (left, smaller)
-          'M62 94 Q72 102 79 112 Q81 123 73 141',
-          // Inner edge detail (right, smaller)
-          'M82 141 Q86 123 89 112 Q96 102 106 94'
+        name: 'Lats', 
+        path: [
+          'M50 65 L35 115 L35 140 L55 160 L74 160 L74 90 Z',
+          'M98 65 L113 115 L113 140 L93 160 L74 160 L74 90 Z',
         ]
       },
-      triceps: { name: 'Triceps', path: 'M7 95 C 5 130, 15 135, 20 130 L 30 90 C 25 95, 15 95, 7 95 Z M143 95 C 145 130, 135 135, 130 130 L 120 90 C 125 95, 135 95, 143 95 Z' },
-      glutes: { name: 'Glutes', path: 'M40 170 C 50 165, 60 175, 70 205 L 40 205 Z M110 170 C 100 165, 90 175, 80 205 L 110 205 Z' },
+      triceps: { 
+        name: 'Triceps', 
+        path: [
+          'M12 95 L28 100 Q30 120 28 130 L12 140 Q10 120 12 95 Z',
+          'M136 95 L120 100 Q118 120 120 130 L136 140 Q138 120 136 95 Z',
+        ]
+      },
+      glutes: { 
+        name: 'Glutes', 
+        path: [
+          'M42 180 L74 180 L74 215 Q55 230 42 200 Z',
+          'M106 180 L74 180 L74 215 Q93 230 106 200 Z',
+        ]
+      },
       hamstrings: {
         name: 'Hamstrings',
         path: [
-          // Left hamstring (up 10px, 5px left from previous)
-          'M45 195 Q60 192 67 198 Q70 210 70 230 Q70 250 67 265 Q64 270 60 270 Q53 270 45 265 Q40 250 40 230 Q40 210 45 195 Z',
-          // Right hamstring (up 10px, 5px left from previous)
-          'M83 195 Q98 192 105 198 Q108 210 108 230 Q108 250 105 265 Q102 270 98 270 Q91 270 83 265 Q78 250 78 230 Q78 210 83 195 Z',
-          // Muscle separation lines for left hamstring (up 10px, 5px left)
-          'M48 200 L 48 260',
-          'M62 200 L 62 260',
-          // Muscle separation lines for right hamstring (up 10px, 5px left)
-          'M86 200 L 86 260',
-          'M100 200 L 100 260'
+          'M42 210 Q35 240 40 280 L62 280 Q65 240 74 215 Z',
+          'M106 210 Q113 240 108 280 L86 280 Q83 240 74 215 Z',
         ]
       },
-    },
-  },
-  side: {
-    outline: 'M100 5 C 120 5, 130 40, 120 80 S 90 150, 100 220 S 90 350, 100 395 L 95 395 C 85 350, 95 220, 80 150 S 110 40, 100 5 Z',
-    muscles: {
-      shoulders_side: { name: 'Shoulders', path: 'M120 80 C 140 90, 135 115, 118 115 C 125 105, 125 90, 120 80 Z' },
-      chest_side: { name: 'Chest', path: 'M118 115 C 125 125, 125 135, 120 140 L 110 140 C 112 130, 115 120, 118 115 Z' },
-      abs_side: { name: 'Obliques', path: 'M110 140 L 120 140 C 120 160, 115 190, 110 190 Z' },
-      glutes_side: { name: 'Glutes', path: 'M80 185 C 105 185, 110 200, 105 225 L 85 225 C 85 200, 80 190, 80 185 Z' },
-      quadriceps_side: { name: 'IT Band', path: 'M105 225 C 110 250, 110 290, 105 290 L 95 290 C 95 250, 100 230, 105 225 Z' },
     },
   },
   common: {
@@ -133,74 +104,124 @@ const MUSCLE_DATA = {
       calves: {
         name: 'Calves',
         path: [
-          // Left calf (up 10px, net 5px left)
-          'M50 285 Q60 280 70 285 Q75 295 75 315 Q75 335 70 355 Q65 365 60 365 Q55 365 50 355 Q45 335 45 315 Q45 295 50 285 Z',
-          // Right calf (up 10px, net 5px left)
-          'M80 285 Q90 280 100 285 Q105 295 105 315 Q105 335 100 355 Q95 365 90 365 Q85 365 80 355 Q75 335 75 315 Q75 295 80 285 Z',
-          // Muscle definition for left calf (up 10px, net 5px left)
-          'M55 290 Q60 285 65 290 Q70 300 70 320 Q70 340 65 350 Q60 355 55 350 Q50 340 50 320 Q50 300 55 290 Z',
-          // Muscle definition for right calf (up 10px, net 5px left)
-          'M85 290 Q90 285 95 290 Q100 300 100 320 Q100 340 95 350 Q90 355 85 350 Q80 340 80 320 Q80 300 85 290 Z'
+          'M40 280 Q38 300 40 320 L65 320 Q67 300 62 280 Z',
+          'M108 280 Q110 300 108 320 L83 320 Q81 300 86 280 Z',
         ]
       },
     },
   },
 };
 
+// --- Inline SVG Components for Robust Rendering ---
+
+const FrontBody = () => (
+  <>
+    <Path 
+      d="M74 10 C65 10 58 18 58 30 C58 40 64 48 74 48 C84 48 90 40 90 30 C90 18 83 10 74 10 Z" 
+      fill="url(#skinGradient)" 
+      stroke={CONFIG.BODY_STROKE} 
+      strokeWidth="1"
+    />
+    <Path 
+      d="M74 48 L65 50 Q50 55 40 65 Q35 68 25 68 Q15 70 12 85 Q10 100 15 115 L12 140 Q10 150 8 160 L5 180 L18 185 L22 175 L25 155 L28 130 Q30 120 35 115 L35 140 Q38 160 42 180 Q40 190 38 200 Q35 220 35 240 Q35 260 40 280 Q38 300 40 320 L42 360 L55 365 L65 360 L65 330 Q65 300 62 280 Q60 250 68 210 L74 215 L80 210 Q88 250 86 280 Q83 300 83 330 L83 360 L93 365 L106 360 Q108 320 110 300 Q112 280 108 260 Q113 240 113 220 Q110 190 106 180 Q110 160 113 140 L113 115 Q118 120 120 130 L123 155 L126 175 L130 185 L143 180 L140 160 Q138 150 136 140 Q138 115 133 100 Q130 70 123 68 Q113 65 98 55 L83 50 L74 48 Z" 
+      fill="url(#skinGradient)" 
+      stroke={CONFIG.BODY_STROKE} 
+      strokeWidth="1"
+    />
+    {/* Definition Lines */}
+    <Path d="M45 95 Q60 105 74 105 Q88 105 103 95" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="1"/>
+    <Path d="M74 50 L74 105" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M74 105 L74 190" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M65 125 Q74 130 83 125" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M66 145 Q74 150 82 145" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M67 165 Q74 170 81 165" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M45 280 Q50 285 58 280" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M90 280 Q98 285 103 280" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+  </>
+);
+
+const BackBody = () => (
+  <>
+    <Path 
+      d="M74 10 C65 10 58 18 58 30 C58 40 64 48 74 48 C84 48 90 40 90 30 C90 18 83 10 74 10 Z" 
+      fill="url(#skinGradientBack)" 
+      stroke={CONFIG.BODY_STROKE} 
+      strokeWidth="1"
+    />
+    <Path 
+      d="M74 48 L65 50 Q50 55 40 65 Q35 68 25 68 Q15 70 12 85 Q10 100 15 115 L12 140 Q10 150 8 160 L5 180 L18 185 L22 175 L25 155 L28 130 Q30 120 35 115 L35 140 Q38 160 42 180 Q40 190 38 200 Q35 220 35 240 Q35 260 40 280 Q38 300 40 320 L42 360 L55 365 L65 360 L65 330 Q65 300 62 280 Q60 250 68 210 L74 215 L80 210 Q88 250 86 280 Q83 300 83 330 L83 360 L93 365 L106 360 Q108 320 110 300 Q112 280 108 260 Q113 240 113 220 Q110 190 106 180 Q110 160 113 140 L113 115 Q118 120 120 130 L123 155 L126 175 L130 185 L143 180 L140 160 Q138 150 136 140 Q138 115 133 100 Q130 70 123 68 Q113 65 98 55 L83 50 L74 48 Z" 
+      fill="url(#skinGradientBack)" 
+      stroke={CONFIG.BODY_STROKE} 
+      strokeWidth="1"
+    />
+    {/* Definition Lines */}
+    <Path d="M74 50 L74 190" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M74 90 L55 80" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M74 90 L93 80" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M42 200 Q55 230 74 215" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M106 200 Q93 230 74 215" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M40 300 Q50 310 62 300" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+    <Path d="M86 300 Q98 310 108 300" fill="none" stroke={CONFIG.BODY_DETAIL_STROKE} strokeWidth="0.5"/>
+  </>
+);
+
 interface MuscleProps {
   path: string;
   name: string;
   muscleId: string;
   isSelected: boolean;
-  onPress: (muscleId: string) => void;
+  onPress?: (muscleId: string) => void;
 }
 
-// --- Reusable Muscle Component (Memoized & Improved UX) ---
+// --- Reusable Muscle Component ---
 const Muscle = React.memo(({ path, muscleId, isSelected, onPress }: MuscleProps) => (
   <Path
     d={path}
     fill={isSelected ? CONFIG.SELECTED_COLOR : CONFIG.UNSELECTED_COLOR}
-    stroke={CONFIG.STROKE_COLOR}
+    stroke={isSelected ? CONFIG.SELECTED_COLOR : 'none'}
     strokeWidth={CONFIG.STROKE_WIDTH}
-    onPress={() => onPress(muscleId)}
+    onPress={onPress ? () => onPress(muscleId) : undefined}
+    opacity={isSelected ? 0.7 : 0} 
   />
 ));
 
 Muscle.displayName = 'Muscle';
 
 interface BodyViewProps {
-  view: 'front' | 'back' | 'side';
+  view: 'front' | 'back';
   selectedMuscles: Set<string>;
-  onMusclePress: (muscleId: string) => void;
+  onMusclePress?: (muscleId: string) => void;
+  height?: number;
+  width?: number;
 }
 
-// --- Reusable Body View Component (Memoized & Handles Multi-Path Muscles) ---
-const BodyView = React.memo(({ view, selectedMuscles, onMusclePress }: BodyViewProps) => {
-  const viewData = MUSCLE_DATA[view];
+// --- Body View Component ---
+const BodyView = React.memo(({ view, selectedMuscles, onMusclePress, height = 300, width = 150 }: BodyViewProps) => {
   const commonMuscles = MUSCLE_DATA.common.muscles;
-  const allMuscles = { ...viewData.muscles, ...commonMuscles };
-
-  // Select the correct SVG image for the background
-  const svgImage = view === 'back'
-    ? require('../assets/images/back.svg')
-    : require('../assets/images/front.svg');
+  const viewMuscles = MUSCLE_DATA[view].muscles;
+  const allMuscles = { ...viewMuscles, ...commonMuscles };
 
   return (
     <View style={styles.bodyViewContainer}>
-      <Text style={styles.bodyViewTitle}>{`${view.charAt(0).toUpperCase()}${view.slice(1)} View`}</Text>
-      <Svg height="300" width="150" viewBox="0 0 148 380" style={styles.svgContainer}>
-        <Image
-          href={svgImage}
-          width="148"
-          height="380"
-          x="0"
-          y="0"
-        />
-        {Object.entries(allMuscles).map(([id, { name, path }]) => {
-          // If the path is an array, map over it to render each part.
-          // This allows muscles like the abs to be one clickable group made of multiple shapes.
+      <Svg height={height} width={width} viewBox="0 0 148 380" style={styles.svgContainer}>
+        <Defs>
+          <LinearGradient id="skinGradient" x1="74" y1="0" x2="74" y2="380" gradientUnits="userSpaceOnUse">
+            <Stop offset="0" stopColor={CONFIG.BODY_FILL_GRADIENT_START} />
+            <Stop offset="1" stopColor={CONFIG.BODY_FILL_GRADIENT_END} />
+          </LinearGradient>
+          <LinearGradient id="skinGradientBack" x1="74" y1="0" x2="74" y2="380" gradientUnits="userSpaceOnUse">
+            <Stop offset="0" stopColor={CONFIG.BODY_FILL_GRADIENT_START} />
+            <Stop offset="1" stopColor={CONFIG.BODY_FILL_GRADIENT_END} />
+          </LinearGradient>
+        </Defs>
+
+        {/* Draw the human body directly using Paths */}
+        {view === 'front' ? <FrontBody /> : <BackBody />}
+        
+        {/* Draw muscles on top */}
+        {Object.entries(allMuscles).map(([id, { name, path }]: [string, any]) => {
           if (Array.isArray(path)) {
-            return path.map((subPath, index) => (
+            return path.map((subPath: string, index: number) => (
               <Muscle
                 key={`${view}-${id}-${index}`}
                 path={subPath}
@@ -211,7 +232,6 @@ const BodyView = React.memo(({ view, selectedMuscles, onMusclePress }: BodyViewP
               />
             ));
           }
-          // Otherwise, render a single path.
           return (
             <Muscle
               key={`${view}-${id}`}
@@ -229,6 +249,31 @@ const BodyView = React.memo(({ view, selectedMuscles, onMusclePress }: BodyViewP
 });
 
 BodyView.displayName = 'BodyView';
+
+interface MuscleMapProps {
+    highlightedMuscles: Set<string>;
+    height?: number;
+    width?: number;
+}
+
+export const MuscleMap = React.memo(({ highlightedMuscles, height = 150, width = 75 }: MuscleMapProps) => {
+    return (
+        <View style={styles.muscleMapRow}>
+            <BodyView 
+                view="front" 
+                selectedMuscles={highlightedMuscles} 
+                height={height} 
+                width={width}
+            />
+            <BodyView 
+                view="back" 
+                selectedMuscles={highlightedMuscles} 
+                height={height} 
+                width={width}
+            />
+        </View>
+    );
+});
 
 // --- Main App Component ---
 export default function HumanMuscleMap() {
@@ -252,9 +297,9 @@ export default function HumanMuscleMap() {
 
   const muscleNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    Object.values(MUSCLE_DATA).forEach(view => {
+    Object.values(MUSCLE_DATA).forEach((view: any) => {
       if (view.muscles) {
-        Object.entries(view.muscles).forEach(([id, { name }]) => {
+        Object.entries(view.muscles).forEach(([id, { name }]: [string, any]) => {
           if (!map.has(id)) {
             map.set(id, name);
           }
@@ -270,9 +315,14 @@ export default function HumanMuscleMap() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.bodyViewsWrapper}>
-          <BodyView view="front" selectedMuscles={selectedMuscles} onMusclePress={toggleMuscleSelection} />
-          <BodyView view="back" selectedMuscles={selectedMuscles} onMusclePress={toggleMuscleSelection} />
-          {/* <BodyView view="side" selectedMuscles={selectedMuscles} onMusclePress={toggleMuscleSelection} /> */}
+          <View style={styles.viewColumn}>
+            <Text style={styles.bodyViewTitle}>Front</Text>
+            <BodyView view="front" selectedMuscles={selectedMuscles} onMusclePress={toggleMuscleSelection} />
+          </View>
+          <View style={styles.viewColumn}>
+            <Text style={styles.bodyViewTitle}>Back</Text>
+            <BodyView view="back" selectedMuscles={selectedMuscles} onMusclePress={toggleMuscleSelection} />
+          </View>
         </View>
 
         <View style={styles.selectedMusclesContainer}>
@@ -312,102 +362,95 @@ const styles = StyleSheet.create({
   scrollContent: {
     alignItems: 'center',
     paddingVertical: 24,
-    paddingHorizontal: 16, // p-4 sm:p-6
-    flexGrow: 1, // min-h-screen
-  },
-  header: {
-    fontSize: 28, // text-3xl
-    fontWeight: 'bold',
-    color: '#1F2937', // text-gray-800
-    marginBottom: 24, // mb-6
-    textAlign: 'center',
+    paddingHorizontal: 16,
+    flexGrow: 1,
   },
   bodyViewsWrapper: {
     flexDirection: 'row',
     justifyContent: 'center',
-    flexWrap: 'wrap', // flex-wrap
-    gap: 16, // gap-4
-    marginBottom: 32, // mb-8
+    gap: 24,
+    marginBottom: 32,
+  },
+  viewColumn: {
+    alignItems: 'center',
+  },
+  muscleMapRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
   },
   bodyViewContainer: {
     flexDirection: 'column',
     alignItems: 'center',
-    marginHorizontal: 8, // mx-2
   },
   bodyViewTitle: {
-    fontSize: 18, // text-lg
+    fontSize: 14,
     fontWeight: '600',
-    color: '#4F46E5', // text-indigo-600
-    marginBottom: 8, // mb-2
-    textTransform: 'capitalize',
+    color: '#666666',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   svgContainer: {
-    borderWidth: 2, // border-2
-    borderColor: '#D1D5DB', // border-gray-300
-    borderRadius: 12, // rounded-xl
-    backgroundColor: '#FFFFFF', // bg-white
-    elevation: 6, // shadow-lg
-    minHeight: 300, // min-h-[300px]
+    backgroundColor: 'transparent',
   },
   selectedMusclesContainer: {
     width: '100%',
-    maxWidth: 800, // max-w-2xl
+    maxWidth: 800,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12, // rounded-xl
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
-    elevation: 6, // shadow-lg
-    padding: 24, // p-6
+    elevation: 6,
+    padding: 24,
   },
   selectedMusclesHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB', // border-gray-200
-    paddingBottom: 12, // pb-3
-    marginBottom: 16, // mb-4
+    borderBottomColor: '#E5E7EB',
+    paddingBottom: 12,
+    marginBottom: 16,
   },
   selectedMusclesTitle: {
-    fontSize: 20, // text-xl
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#1F2937', // text-gray-800
+    color: '#1F2937',
   },
   resetButton: {
-    backgroundColor: '#E5E7EB', // bg-gray-200
-    paddingVertical: 8, // py-2
-    paddingHorizontal: 16, // px-4
-    borderRadius: 9999, // rounded-full
-    // hover:bg-gray-300 handled by TouchableOpacity
+    backgroundColor: '#E5E7EB',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 9999,
   },
   resetButtonText: {
-    color: '#4B5563', // text-gray-700
+    color: '#4B5563',
     fontWeight: '600',
-    fontSize: 14, // text-sm
+    fontSize: 14,
   },
   selectedMusclesList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12, // gap-3
-    minHeight: 48, // min-h-[3rem] (3 * 16 = 48)
+    gap: 12,
+    minHeight: 48,
     alignItems: 'center',
   },
   noSelectionText: {
     fontStyle: 'italic',
-    color: '#6B7280', // text-gray-500
+    color: '#6B7280',
   },
   selectedMuscleTag: {
-    backgroundColor: '#DBEAFE', // bg-blue-100
-    borderRadius: 9999, // rounded-full
+    backgroundColor: '#FEE2E2',
+    borderRadius: 9999,
     paddingVertical: 6,
     paddingHorizontal: 16,
-    // animate-fade-in not directly translated via StyleSheet
   },
   selectedMuscleText: {
-    color: '#1E40AF', // text-blue-800
+    color: '#DC2626',
     fontWeight: '600',
-    fontSize: 14, // text-sm
+    fontSize: 14,
   },
-}); 
+});

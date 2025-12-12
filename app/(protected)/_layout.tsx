@@ -117,7 +117,8 @@ export default function ProtectedLayout() {
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="workout/WorkoutScreen" options={{ headerShown: false }} />
-          <Stack.Screen name="workout-history" options={{ title: 'Workout History' }} />
+          <Stack.Screen name="workout-history" options={{ headerShown: false }} />
+          <Stack.Screen name="settings" options={{ headerShown: false }} />
         </Stack>
       </UserCapacityProvider>
     </ProfileProvider>

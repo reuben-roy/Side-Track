@@ -146,14 +146,15 @@ export default function WorkoutHistoryScreen() {
         style={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header with Back Button */}
-        <View style={styles.headerContainer}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backButtonText}>← Back</Text>
+        {/* Header Row */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+            <Text style={styles.closeButtonText}>×</Text>
           </TouchableOpacity>
+        </View>
+        
+        {/* Header */}
+        <View style={styles.headerContainer}>
           <Text style={styles.header}>Workout History</Text>
           <Text style={styles.subHeader}>View and manage your workout logs</Text>
         </View>
@@ -237,25 +238,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   scrollContent: {
-    paddingTop: 60,
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
+  headerRow: {
+    paddingTop: 60,
+    marginBottom: 16,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: -8,
+  },
+  closeButtonText: {
+    fontSize: 32,
+    color: '#181C20',
+  },
   headerContainer: {
     marginBottom: 32,
-  },
-  backButton: {
-    marginBottom: 16,
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 20,
-  },
-  backButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000000',
   },
   header: {
     fontSize: 34,

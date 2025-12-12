@@ -1,10 +1,11 @@
 import ProfileButton from '@/components/ProfileButton';
 import { getMuscleCapacity } from '@/lib/database';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { Animated, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';
 import { useUserCapacity } from '../../../context/UserCapacityContext';
 import WorkoutScreen from '../workout/WorkoutScreen';
+// import { MuscleMap } from '../../../components/HumanMuscleMap';
 
 const ITEM_HEIGHT = 48;
 const ITEM_MARGIN = 12; // Space between items
@@ -42,6 +43,31 @@ export default function HomeScreen() {
   const selectedExercise = exercises[exerciseIdx];
   const WEIGHTS = selectedExercise.weights.map(w => typeof w === 'number' ? `${w} lbs` : w);
   const REPS = selectedExercise.reps.map(r => `${r} reps`);
+
+  /*
+  const highlightedMuscles = useMemo(() => {
+    const muscles = selectedExercise.muscles;
+    const mapped = new Set<string>();
+    Object.keys(muscles).forEach(m => {
+        switch(m) {
+            case 'pecs': mapped.add('chest'); break;
+            case 'quads': mapped.add('quadriceps'); break;
+            case 'hamstrings': mapped.add('hamstrings'); break;
+            case 'glutes': mapped.add('glutes'); break;
+            case 'calves': mapped.add('calves'); break;
+            case 'anteriorDeltoids': 
+            case 'medialDeltoids': 
+            case 'posteriorDeltoids': mapped.add('shoulders'); break;
+            case 'triceps': mapped.add('triceps'); break;
+            case 'biceps': mapped.add('biceps'); break;
+            case 'lats': mapped.add('lats'); break;
+            case 'upperBack': mapped.add('traps'); break;
+            case 'core': mapped.add('abs'); break;
+        }
+    });
+    return mapped;
+  }, [selectedExercise]);
+  */
 
   React.useEffect(() => {
     setWeightIdx(0);
@@ -184,6 +210,12 @@ export default function HomeScreen() {
 
         {/* Right Side: Buttons */}
         <View style={styles.buttonsColumn}>
+          {/* 
+          <View style={styles.mapContainer}>
+             <MuscleMap highlightedMuscles={highlightedMuscles} height={130} width={65} />
+          </View>
+          */}
+          
           <TouchableOpacity 
             style={styles.pickButton} 
             onPress={() => setShowWorkout(true)}
@@ -380,6 +412,12 @@ const styles = StyleSheet.create({
     flex: 2,
     justifyContent: 'flex-end',
     gap: 10,
+  },
+  mapContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 'auto', // Push to top
+    marginTop: 10,
   },
   slotLabel: {
     fontSize: 12,
