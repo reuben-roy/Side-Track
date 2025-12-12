@@ -1,4 +1,5 @@
 import { getProfile, saveProfile } from '@/lib/database';
+import { syncBodyMetricsToHealth } from '@/lib/healthSyncHelper';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 export const FIELDS = [
@@ -72,6 +73,16 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
       const updated = { ...profile, [key]: value };
       setProfile(updated);
       await saveProfile(updated);
+      
+      // Sync body metrics to health platform if weight or height changed
+      if (key === 'weight' || key === 'height') {
+        try {
+          await syncBodyMetricsToHealth();
+        } catch (healthError) {
+          // Silently fail health sync - don't interrupt user flow
+          console.error('Health sync error:', healthError);
+        }
+      }
     } catch (error) {
       console.error('Error updating profile:', error);
     }
@@ -81,6 +92,14 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
     try {
       setProfile(newProfile);
       await saveProfile(newProfile);
+      
+      // Sync body metrics to health platform
+      try {
+        await syncBodyMetricsToHealth();
+      } catch (healthError) {
+        // Silently fail health sync - don't interrupt user flow
+        console.error('Health sync error:', healthError);
+      }
     } catch (error) {
       console.error('Error updating full profile:', error);
     }

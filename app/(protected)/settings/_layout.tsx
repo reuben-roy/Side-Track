@@ -10,6 +10,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="limits" />
       <Stack.Screen name="backup" />
       <Stack.Screen name="data" />
+      <Stack.Screen name="health" />
     </Stack>
   );
 }

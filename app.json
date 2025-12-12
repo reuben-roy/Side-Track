@@ -21,7 +21,9 @@
           "https",
           "http"
         ],
-        "NSLocationWhenInUseUsageDescription": "SideTrack uses your location to show you local rankings and compare your strength with people in your area."
+        "NSLocationWhenInUseUsageDescription": "SideTrack uses your location to show you local rankings and compare your strength with people in your area.",
+        "NSHealthShareUsageDescription": "SideTrack needs access to your health data to sync your workouts and fitness metrics with Apple Health.",
+        "NSHealthUpdateUsageDescription": "SideTrack needs permission to write your workout data and fitness metrics to Apple Health."
       }
     },
     "android": {

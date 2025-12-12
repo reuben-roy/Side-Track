@@ -7,6 +7,7 @@ import {
   getMuscleCapacity,
   updateAllMuscleCapacity,
 } from '@/lib/database';
+import { syncWorkoutToHealth } from '@/lib/healthSyncHelper';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';
@@ -221,6 +222,15 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
 
       // Refresh stats after logging
       await fetchExerciseStats();
+
+      // --- Sync to Health Platform (if enabled) ---
+      try {
+        await syncWorkoutToHealth(exercise, actualWeight, currentReps);
+      } catch (healthError) {
+        // Silently fail health sync - don't interrupt user flow
+        console.error('Health sync error:', healthError);
+      }
+      // --- End health sync ---
 
       setLogging(false);
       setShowToast(true);

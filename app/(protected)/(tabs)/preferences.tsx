@@ -78,6 +78,11 @@ export default function PreferencesScreen() {
             icon="trash-outline" 
             route="/settings/data" 
           />
+          <SettingsItem 
+            label="Health Integration" 
+            icon="heart-outline" 
+            route="/settings/health" 
+          />
         </View>
 
         <View style={styles.appInfo}>
