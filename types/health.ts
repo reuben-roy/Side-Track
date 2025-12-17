@@ -18,6 +18,11 @@ export interface HealthBodyMetrics {
   date: string;
 }
 
+export interface HealthActiveCaloriesSample {
+  date: string; // ISO string
+  calories: number; // kcal
+}
+
 export interface HealthSyncStatus {
   isAvailable: boolean;
   isAuthorized: boolean;

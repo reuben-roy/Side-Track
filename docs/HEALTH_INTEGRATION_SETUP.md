@@ -68,7 +68,7 @@ For Android, you need to install a Health Connect library:
    - `NSHealthUpdateUsageDescription` - For writing health data
 
 3. **Update the iOS implementation**:
-   - Open `lib/healthSync.ios.ts`
+   - Open `lib/healthSyncIOS.ts`
    - Replace placeholder imports with actual library imports
    - Implement the TODO sections using the library's API
 
@@ -94,7 +94,7 @@ For Android, you need to install a Health Connect library:
    ```
 
 3. **Update the Android implementation**:
-   - Open `lib/healthSync.android.ts`
+   - Open `lib/healthSyncAndroid.ts`
    - Replace placeholder imports with actual library imports
    - Implement the TODO sections using the library's API
 

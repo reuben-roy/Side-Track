@@ -59,6 +59,85 @@ export async function updateLastSyncDate(): Promise<void> {
 }
 
 /**
+ * Exercise categories for duration estimation
+ * Based on typical set execution time, setup requirements, and rest needs
+ */
+type ExerciseCategory = 'heavy_compound' | 'medium_compound' | 'machine' | 'isolation' | 'bodyweight';
+
+const exerciseCategories: Record<string, ExerciseCategory> = {
+  // Heavy compound lifts - longest duration (setup, bracing, controlled reps)
+  'Deadlift': 'heavy_compound',
+  'Squat': 'heavy_compound',
+  'Front Squat': 'heavy_compound',
+  'Sumo Deadlift': 'heavy_compound',
+  
+  // Medium compound lifts - moderate duration
+  'Bench Press': 'medium_compound',
+  'Incline Bench Press': 'medium_compound',
+  'Overhead Press': 'medium_compound',
+  'Barbell Row': 'medium_compound',
+  'Hip Thrust': 'medium_compound',
+  'Leg Press': 'medium_compound',
+  'Bulgarian Split Squat': 'medium_compound',
+  'Dumbbell Press': 'medium_compound',
+  
+  // Machine/cable exercises - shorter setup, controlled movement
+  'Lat Pulldown': 'machine',
+  'Seated Row': 'machine',
+  'Machine Chest Press': 'machine',
+  'Machine Shoulder Press': 'machine',
+  'Rope Triceps Pushdown': 'machine',
+  'Cable Lateral Raise': 'machine',
+  'Face Pull': 'machine',
+  
+  // Bodyweight exercises - variable duration
+  'Pull-Up': 'bodyweight',
+  'Triceps Dip': 'bodyweight',
+  
+  // Isolation exercises - shortest duration per rep
+  'Dumbbell Curl': 'isolation',
+  'Hammer Curl': 'isolation',
+  'Preacher Curl': 'isolation',
+  'Dumbbell Lateral Raise': 'isolation',
+  'Reverse Fly': 'isolation',
+  'Calf Raise': 'isolation',
+};
+
+/**
+ * Estimate workout duration based on exercise type and rep count
+ * Returns duration in seconds
+ */
+function estimateWorkoutDuration(exerciseName: string, reps: number): number {
+  const category = exerciseCategories[exerciseName] || 'medium_compound';
+  
+  // Time per rep (in seconds) based on exercise category
+  // Includes eccentric + concentric movement + brief pause
+  const secondsPerRep: Record<ExerciseCategory, number> = {
+    heavy_compound: 5,      // Deadlifts, squats need setup per rep
+    medium_compound: 3.5,   // Bench, rows - controlled movement
+    machine: 2.5,           // Machines guide the movement
+    bodyweight: 3,          // Pull-ups, dips
+    isolation: 2,           // Curls, raises - faster tempo
+  };
+  
+  // Rest/setup time between reps (heavier exercises need more)
+  const restTimeSeconds: Record<ExerciseCategory, number> = {
+    heavy_compound: 90,     // Heavy lifts need more recovery
+    medium_compound: 60,    // Standard rest
+    machine: 45,            // Less recovery needed
+    bodyweight: 60,         // Moderate rest
+    isolation: 30,          // Quick rest for isolation
+  };
+  
+  // Calculate total duration: (time per rep × reps) + rest time
+  const repTime = secondsPerRep[category] * reps;
+  const rest = restTimeSeconds[category];
+  
+  // Minimum 30 seconds, maximum 5 minutes per set
+  return Math.max(30, Math.min(300, repTime + rest));
+}
+
+/**
  * Calculate calories for a workout using MET values
  */
 function calculateWorkoutCalories(
@@ -70,8 +149,9 @@ function calculateWorkoutCalories(
   const exercise = exercises.find(e => e.name === exerciseName);
   const met = exercise ? exercise.met : 5; // Default MET if exercise not found
   
-  // Estimate duration: 2 minutes per set
-  const durationMin = 2;
+  // Use estimated duration based on exercise type
+  const durationSeconds = estimateWorkoutDuration(exerciseName, reps);
+  const durationMin = durationSeconds / 60;
   const weightKg = profileWeightLbs * 0.453592;
   
   // Calories = (MET * weightKg * 3.5 / 200) * duration (min)
@@ -86,6 +166,7 @@ function convertWorkoutLogToHealth(
   log: { exercise: string; weight: number; reps: number; date: string },
   profileWeightLbs: number
 ): HealthWorkout {
+  const duration = estimateWorkoutDuration(log.exercise, log.reps);
   const calories = calculateWorkoutCalories(log.exercise, log.weight, log.reps, profileWeightLbs);
   
   return {
@@ -93,7 +174,7 @@ function convertWorkoutLogToHealth(
     weight: log.weight,
     reps: log.reps,
     date: log.date,
-    duration: 120, // 2 minutes per set (in seconds)
+    duration,
     calories,
   };
 }
@@ -123,12 +204,13 @@ export async function syncWorkoutToHealth(
       ? parseFloat(profile.weight.match(/(\d+\.?\d*)/)?.[1] || '170')
       : 170;
 
+    const duration = estimateWorkoutDuration(exercise, reps);
     const healthWorkout: HealthWorkout = {
       exercise,
       weight,
       reps,
       date: new Date().toISOString(),
-      duration: 120,
+      duration,
       calories: calculateWorkoutCalories(exercise, weight, reps, profileWeightLbs),
     };
 

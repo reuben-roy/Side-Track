@@ -132,6 +132,10 @@ export default function HealthSettingsScreen() {
     }
   };
 
+  const handleViewHealthData = () => {
+    router.push('/settings/health-data');
+  };
+
   const updateSyncOption = async (key: keyof HealthSyncOptions, value: boolean) => {
     const updated = { ...syncOptions, [key]: value };
     setSyncOptions(updated);
@@ -272,6 +276,13 @@ export default function HealthSettingsScreen() {
                     Import Workouts (Last 30 Days)
                   </Text>
                 )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>View</Text>
+              <TouchableOpacity style={styles.syncButton} onPress={handleViewHealthData}>
+                <Text style={styles.syncButtonText}>View Health Data</Text>
               </TouchableOpacity>
             </View>
           </>

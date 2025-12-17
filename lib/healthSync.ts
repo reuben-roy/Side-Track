@@ -3,77 +3,76 @@
  * 
  * This file provides a unified interface for syncing with Apple HealthKit (iOS)
  * and Android Health Connect. Platform-specific implementations are in:
- * - lib/healthSync.ios.ts (iOS/HealthKit)
- * - lib/healthSync.android.ts (Android/Health Connect)
+ * - lib/healthSyncIOS.ts (iOS/HealthKit)
+ * - lib/healthSyncAndroid.ts (Android/Health Connect)
  */
 
 import { Platform } from 'react-native';
-import type { HealthBodyMetrics, HealthSyncStatus, HealthWorkout, HealthPermissions, HealthSyncOptions } from '../types/health';
+import type {
+  HealthActiveCaloriesSample,
+  HealthBodyMetrics,
+  HealthSyncStatus,
+  HealthWorkout,
+  HealthPermissions,
+  HealthSyncOptions,
+} from '../types/health';
+
+// No-op implementation for when health sync isn't available
+const noopImplementation = {
+  checkAvailability: async () => false,
+  requestPermissions: async () => false,
+  getSyncStatus: async () => ({
+    isAvailable: false,
+    isAuthorized: false,
+    platform: 'none' as const,
+  }),
+  writeWorkout: async () => false,
+  writeWorkouts: async () => 0,
+  readWorkouts: async () => [] as HealthWorkout[],
+  writeBodyMetrics: async () => false,
+  readBodyMetrics: async () => [] as HealthBodyMetrics[],
+  writeCalories: async () => false,
+  readActiveCalories: async () => [] as HealthActiveCaloriesSample[],
+};
 
 // Platform-specific implementations will be imported conditionally
-let healthSyncImpl: {
-  checkAvailability: () => Promise<boolean>;
-  requestPermissions: (permissions: HealthPermissions) => Promise<boolean>;
-  getSyncStatus: () => Promise<HealthSyncStatus>;
-  writeWorkout: (workout: HealthWorkout) => Promise<boolean>;
-  writeWorkouts: (workouts: HealthWorkout[]) => Promise<number>;
-  readWorkouts: (startDate: Date, endDate: Date) => Promise<HealthWorkout[]>;
-  writeBodyMetrics: (metrics: HealthBodyMetrics) => Promise<boolean>;
-  readBodyMetrics: (startDate: Date, endDate: Date) => Promise<HealthBodyMetrics[]>;
-  writeCalories: (calories: number, date: Date) => Promise<boolean>;
-} | null = null;
+let healthSyncImpl: typeof noopImplementation | null = null;
+let loadAttempted = false;
 
 // Lazy load platform-specific implementation
-const getHealthSyncImpl = async () => {
+const getHealthSyncImpl = async (): Promise<typeof noopImplementation> => {
   if (healthSyncImpl) {
     return healthSyncImpl;
   }
 
-  try {
-    if (Platform.OS === 'ios') {
-      const iosImpl = await import('./healthSync.ios');
-      healthSyncImpl = iosImpl.default;
-    } else if (Platform.OS === 'android') {
-      const androidImpl = await import('./healthSync.android');
-      healthSyncImpl = androidImpl.default;
-    } else {
-      // Web/unsupported platform - return no-op implementation
-      healthSyncImpl = {
-        checkAvailability: async () => false,
-        requestPermissions: async () => false,
-        getSyncStatus: async () => ({
-          isAvailable: false,
-          isAuthorized: false,
-          platform: 'none',
-        }),
-        writeWorkout: async () => false,
-        writeWorkouts: async () => 0,
-        readWorkouts: async () => [],
-        writeBodyMetrics: async () => false,
-        readBodyMetrics: async () => [],
-        writeCalories: async () => false,
-      };
-    }
-  } catch (error) {
-    console.error('Failed to load health sync implementation:', error);
-    // Return no-op implementation on error
-    healthSyncImpl = {
-      checkAvailability: async () => false,
-      requestPermissions: async () => false,
-      getSyncStatus: async () => ({
-        isAvailable: false,
-        isAuthorized: false,
-        platform: 'none',
-      }),
-      writeWorkout: async () => false,
-      writeWorkouts: async () => 0,
-      readWorkouts: async () => [],
-      writeBodyMetrics: async () => false,
-      readBodyMetrics: async () => [],
-      writeCalories: async () => false,
-    };
+  if (loadAttempted) {
+    return noopImplementation;
   }
 
+  loadAttempted = true;
+
+  try {
+    if (Platform.OS === 'ios') {
+      // Try to load iOS implementation
+      const iosImpl = await import('./healthSyncIOS');
+      if (iosImpl?.default) {
+        healthSyncImpl = iosImpl.default;
+        return healthSyncImpl;
+      }
+    } else if (Platform.OS === 'android') {
+      // Try to load Android implementation
+      const androidImpl = await import('./healthSyncAndroid');
+      if (androidImpl?.default) {
+        healthSyncImpl = androidImpl.default;
+        return healthSyncImpl;
+      }
+    }
+  } catch (error) {
+    console.warn('Health sync implementation not available:', error);
+  }
+
+  // Fallback to no-op implementation
+  healthSyncImpl = noopImplementation;
   return healthSyncImpl;
 };
 
@@ -81,8 +80,13 @@ const getHealthSyncImpl = async () => {
  * Check if health platform is available on this device
  */
 export async function checkHealthAvailability(): Promise<boolean> {
-  const impl = await getHealthSyncImpl();
-  return impl.checkAvailability();
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.checkAvailability?.() ?? false;
+  } catch (error) {
+    console.warn('checkHealthAvailability error:', error);
+    return false;
+  }
 }
 
 /**
@@ -91,24 +95,47 @@ export async function checkHealthAvailability(): Promise<boolean> {
 export async function requestHealthPermissions(
   permissions: HealthPermissions
 ): Promise<boolean> {
-  const impl = await getHealthSyncImpl();
-  return impl.requestPermissions(permissions);
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.requestPermissions?.(permissions) ?? false;
+  } catch (error) {
+    console.warn('requestHealthPermissions error:', error);
+    return false;
+  }
 }
 
 /**
  * Get current sync status
  */
 export async function getHealthSyncStatus(): Promise<HealthSyncStatus> {
-  const impl = await getHealthSyncImpl();
-  return impl.getSyncStatus();
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.getSyncStatus?.() ?? {
+      isAvailable: false,
+      isAuthorized: false,
+      platform: 'none',
+    };
+  } catch (error) {
+    console.warn('getHealthSyncStatus error:', error);
+    return {
+      isAvailable: false,
+      isAuthorized: false,
+      platform: 'none',
+    };
+  }
 }
 
 /**
  * Write a single workout to health platform
  */
 export async function writeWorkoutToHealth(workout: HealthWorkout): Promise<boolean> {
-  const impl = await getHealthSyncImpl();
-  return impl.writeWorkout(workout);
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.writeWorkout?.(workout) ?? false;
+  } catch (error) {
+    console.warn('writeWorkoutToHealth error:', error);
+    return false;
+  }
 }
 
 /**
@@ -116,8 +143,13 @@ export async function writeWorkoutToHealth(workout: HealthWorkout): Promise<bool
  * Returns the number of successfully written workouts
  */
 export async function writeWorkoutsToHealth(workouts: HealthWorkout[]): Promise<number> {
-  const impl = await getHealthSyncImpl();
-  return impl.writeWorkouts(workouts);
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.writeWorkouts?.(workouts) ?? 0;
+  } catch (error) {
+    console.warn('writeWorkoutsToHealth error:', error);
+    return 0;
+  }
 }
 
 /**
@@ -127,8 +159,13 @@ export async function readWorkoutsFromHealth(
   startDate: Date,
   endDate: Date
 ): Promise<HealthWorkout[]> {
-  const impl = await getHealthSyncImpl();
-  return impl.readWorkouts(startDate, endDate);
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.readWorkouts?.(startDate, endDate) ?? [];
+  } catch (error) {
+    console.warn('readWorkoutsFromHealth error:', error);
+    return [];
+  }
 }
 
 /**
@@ -137,8 +174,13 @@ export async function readWorkoutsFromHealth(
 export async function writeBodyMetricsToHealth(
   metrics: HealthBodyMetrics
 ): Promise<boolean> {
-  const impl = await getHealthSyncImpl();
-  return impl.writeBodyMetrics(metrics);
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.writeBodyMetrics?.(metrics) ?? false;
+  } catch (error) {
+    console.warn('writeBodyMetricsToHealth error:', error);
+    return false;
+  }
 }
 
 /**
@@ -148,8 +190,13 @@ export async function readBodyMetricsFromHealth(
   startDate: Date,
   endDate: Date
 ): Promise<HealthBodyMetrics[]> {
-  const impl = await getHealthSyncImpl();
-  return impl.readBodyMetrics(startDate, endDate);
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.readBodyMetrics?.(startDate, endDate) ?? [];
+  } catch (error) {
+    console.warn('readBodyMetricsFromHealth error:', error);
+    return [];
+  }
 }
 
 /**
@@ -159,7 +206,29 @@ export async function writeCaloriesToHealth(
   calories: number,
   date: Date
 ): Promise<boolean> {
-  const impl = await getHealthSyncImpl();
-  return impl.writeCalories(calories, date);
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.writeCalories?.(calories, date) ?? false;
+  } catch (error) {
+    console.warn('writeCaloriesToHealth error:', error);
+    return false;
+  }
+}
+
+/**
+ * Read active calories (kcal) from health platform within a date range.
+ * Returned samples may need aggregation (e.g. per-day) by the caller.
+ */
+export async function readActiveCaloriesFromHealth(
+  startDate: Date,
+  endDate: Date
+): Promise<HealthActiveCaloriesSample[]> {
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.readActiveCalories?.(startDate, endDate) ?? [];
+  } catch (error) {
+    console.warn('readActiveCaloriesFromHealth error:', error);
+    return [];
+  }
 }
 
