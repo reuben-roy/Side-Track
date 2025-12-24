@@ -1,4 +1,4 @@
-import { getHealthSyncStatus, readActiveCaloriesFromHealth, readBodyMetricsFromHealth, readWorkoutsFromHealth } from '@/lib/healthSync';
+import { getHealthSyncStatus, readActiveCaloriesFromHealth, readAllWorkoutsFromHealth, readBodyMetricsFromHealth } from '@/lib/healthSync';
 import type { HealthActiveCaloriesSample, HealthBodyMetrics, HealthSyncStatus, HealthWorkout } from '@/types/health';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -58,7 +58,24 @@ function latestMetrics(metrics: HealthBodyMetrics[]) {
 function formatWorkoutLine(w: HealthWorkout) {
   const d = new Date(w.date);
   const when = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const details = [w.exercise, `${w.weight} × ${w.reps}`].join(' • ');
+  
+  // For non-strength workouts (like running), show duration and calories instead of weight/reps
+  const isStrengthWorkout = w.workoutType === 'Traditional Strength Training' || 
+                           w.workoutType === 'Functional Strength Training' ||
+                           (w.weight > 0 && w.reps > 0);
+  
+  let details: string;
+  if (isStrengthWorkout) {
+    details = [w.exercise, w.weight > 0 ? `${w.weight} × ${w.reps}` : `${w.reps} reps`].filter(Boolean).join(' • ');
+  } else {
+    // Cardio/other workouts - show type, duration, calories
+    const durationMin = w.duration ? Math.round(w.duration / 60) : 0;
+    const parts = [w.workoutType || w.exercise];
+    if (durationMin > 0) parts.push(`${durationMin} min`);
+    if (w.calories && w.calories > 0) parts.push(`${Math.round(w.calories)} cal`);
+    details = parts.join(' • ');
+  }
+  
   return `${when} • ${details}`;
 }
 
@@ -83,8 +100,9 @@ export default function HealthDataScreen() {
         setSyncStatus(status);
 
         // Even if not authorized, try to load – implementations should return empty.
+        // Use readAllWorkoutsFromHealth to show all workout types (running, cycling, etc.)
         const [ws, ms, cs] = await Promise.all([
-          readWorkoutsFromHealth(start, end),
+          readAllWorkoutsFromHealth(start, end),
           readBodyMetricsFromHealth(start, end),
           readActiveCaloriesFromHealth(start, end),
         ]);
@@ -257,7 +275,7 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   headerRow: { paddingTop: 60, marginBottom: 16 },
-  closeButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginLeft: -8 },
+  closeButton: { width: 44, height: 44, minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center', marginLeft: -8, padding: 8 },
   closeButtonText: { fontSize: 32, color: '#181C20' },
 
   headerContainer: { marginBottom: 24 },

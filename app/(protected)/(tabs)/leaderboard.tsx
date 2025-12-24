@@ -162,7 +162,7 @@ export default function LeaderboardScreen() {
     }
 
     try {
-      const orderBy = sort === 'wilks' ? 'wilks_score' : 'total_score';
+      const orderBy = sort === 'wilks' ? 'wilks_score' : sort === 'calories' ? 'weekly_calories' : 'total_score';
       
       // Select only needed columns to reduce data transfer
       let query = supabase
@@ -497,7 +497,9 @@ export default function LeaderboardScreen() {
                 <Text style={styles.userRankScore} numberOfLines={1}>
                   {sortMode === 'total' 
                     ? `${leaderboard[currentUserRank - 1].total_score} lbs`
-                    : `${leaderboard[currentUserRank - 1].wilks_score?.toFixed(1) || 'N/A'} Wilks`
+                    : sortMode === 'wilks'
+                    ? `${leaderboard[currentUserRank - 1].wilks_score?.toFixed(1) || 'N/A'} Wilks`
+                    : `${leaderboard[currentUserRank - 1].weekly_calories || 0} cal`
                   }
                 </Text>
               </View>
@@ -511,7 +513,7 @@ export default function LeaderboardScreen() {
               onPress={() => setSortMode('total')}
             >
               <Text style={[styles.sortTabText, sortMode === 'total' && styles.sortTabTextActive]}>
-                Total Weight
+                Strength
               </Text>
             </TouchableOpacity>
             <TouchableOpacity 
@@ -519,7 +521,15 @@ export default function LeaderboardScreen() {
               onPress={() => setSortMode('wilks')}
             >
               <Text style={[styles.sortTabText, sortMode === 'wilks' && styles.sortTabTextActive]}>
-                Wilks Score
+                Wilks
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.sortTab, sortMode === 'calories' && styles.sortTabActive]}
+              onPress={() => setSortMode('calories')}
+            >
+              <Text style={[styles.sortTabText, sortMode === 'calories' && styles.sortTabTextActive]}>
+                Calories
               </Text>
             </TouchableOpacity>
           </View>
@@ -706,10 +716,12 @@ export default function LeaderboardScreen() {
                         <Text style={styles.podiumScore}>
                           {sortMode === 'wilks' 
                             ? leaderboard[1].wilks_score?.toFixed(1)
+                            : sortMode === 'calories'
+                            ? leaderboard[1].weekly_calories || 0
                             : leaderboard[1].total_score
                           }
                         </Text>
-                        <Text style={styles.podiumLabel}>{sortMode === 'wilks' ? 'Wilks' : 'lbs'}</Text>
+                        <Text style={styles.podiumLabel}>{sortMode === 'wilks' ? 'Wilks' : sortMode === 'calories' ? 'cal' : 'lbs'}</Text>
                       </View>
                     )}
 
@@ -731,10 +743,12 @@ export default function LeaderboardScreen() {
                         <Text style={[styles.podiumScore, styles.podiumScoreFirst]}>
                           {sortMode === 'wilks' 
                             ? leaderboard[0].wilks_score?.toFixed(1)
+                            : sortMode === 'calories'
+                            ? leaderboard[0].weekly_calories || 0
                             : leaderboard[0].total_score
                           }
                         </Text>
-                        <Text style={styles.podiumLabel}>{sortMode === 'wilks' ? 'Wilks' : 'lbs'}</Text>
+                        <Text style={styles.podiumLabel}>{sortMode === 'wilks' ? 'Wilks' : sortMode === 'calories' ? 'cal' : 'lbs'}</Text>
                       </View>
                     )}
 
@@ -756,10 +770,12 @@ export default function LeaderboardScreen() {
                         <Text style={styles.podiumScore}>
                           {sortMode === 'wilks' 
                             ? leaderboard[2].wilks_score?.toFixed(1)
+                            : sortMode === 'calories'
+                            ? leaderboard[2].weekly_calories || 0
                             : leaderboard[2].total_score
                           }
                         </Text>
-                        <Text style={styles.podiumLabel}>{sortMode === 'wilks' ? 'Wilks' : 'lbs'}</Text>
+                        <Text style={styles.podiumLabel}>{sortMode === 'wilks' ? 'Wilks' : sortMode === 'calories' ? 'cal' : 'lbs'}</Text>
                       </View>
                     )}
                   </View>
@@ -769,14 +785,21 @@ export default function LeaderboardScreen() {
                 {leaderboard.slice(3).map((entry, index) => {
                   const actualRank = index + 4;
                   const isCurrentUser = user?.id === entry.user_id;
-                  const score = sortMode === 'wilks' ? entry.wilks_score : entry.total_score;
+                  const score = sortMode === 'wilks' 
+                    ? entry.wilks_score 
+                    : sortMode === 'calories' 
+                    ? entry.weekly_calories 
+                    : entry.total_score;
                   const maxScore = sortMode === 'wilks' 
                     ? leaderboard[0]?.wilks_score || 1 
+                    : sortMode === 'calories'
+                    ? leaderboard[0]?.weekly_calories || 1
                     : leaderboard[0]?.total_score || 1;
                   const relativeStrength = ((score || 0) / maxScore) * 100;
                   
-                  // Skip entries with null Wilks score when sorting by Wilks
+                  // Skip entries with null score when sorting by Wilks or Calories
                   if (sortMode === 'wilks' && !entry.wilks_score) return null;
+                  if (sortMode === 'calories' && !entry.weekly_calories) return null;
 
                   return (
                     <View 
@@ -799,9 +822,11 @@ export default function LeaderboardScreen() {
                           <Text style={styles.total}>
                             {sortMode === 'wilks' 
                               ? `${entry.wilks_score?.toFixed(1)}`
+                              : sortMode === 'calories'
+                              ? `${entry.weekly_calories || 0}`
                               : `${entry.total_score}`
                             }
-                            <Text style={styles.unitText}> {sortMode === 'wilks' ? 'Wilks' : 'lbs'}</Text>
+                            <Text style={styles.unitText}> {sortMode === 'wilks' ? 'Wilks' : sortMode === 'calories' ? 'cal/wk' : 'lbs'}</Text>
                           </Text>
                         </View>
                         
@@ -813,7 +838,10 @@ export default function LeaderboardScreen() {
                         {/* Show breakdown */}
                         <View style={styles.breakdownRow}>
                           <Text style={styles.breakdown} numberOfLines={1} ellipsizeMode="tail">
-                            SQ: {entry.squat_1rm || '-'} | DL: {entry.deadlift_1rm || '-'} | BP: {entry.bench_press_1rm || '-'} | OHP: {entry.overhead_press_1rm || '-'}
+                            {sortMode === 'calories' 
+                              ? `Strength: ${entry.total_score} lbs • ${entry.wilks_score?.toFixed(0) || '-'} Wilks`
+                              : `SQ: ${entry.squat_1rm || '-'} | DL: ${entry.deadlift_1rm || '-'} | BP: ${entry.bench_press_1rm || '-'} | OHP: ${entry.overhead_press_1rm || '-'}`
+                            }
                           </Text>
                         </View>
 

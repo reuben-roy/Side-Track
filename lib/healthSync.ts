@@ -15,6 +15,7 @@ import type {
   HealthWorkout,
   HealthPermissions,
   HealthSyncOptions,
+  WorkoutCaloriesSummary,
 } from '../types/health';
 
 // No-op implementation for when health sync isn't available
@@ -29,6 +30,8 @@ const noopImplementation = {
   writeWorkout: async () => false,
   writeWorkouts: async () => 0,
   readWorkouts: async () => [] as HealthWorkout[],
+  readAllWorkouts: async () => [] as HealthWorkout[],
+  getTotalWorkoutCalories: async () => ({ total: 0, byType: {} } as WorkoutCaloriesSummary),
   writeBodyMetrics: async () => false,
   readBodyMetrics: async () => [] as HealthBodyMetrics[],
   writeCalories: async () => false,
@@ -153,7 +156,8 @@ export async function writeWorkoutsToHealth(workouts: HealthWorkout[]): Promise<
 }
 
 /**
- * Read workouts from health platform within a date range
+ * Read strength training workouts from health platform within a date range
+ * Used for import functionality
  */
 export async function readWorkoutsFromHealth(
   startDate: Date,
@@ -164,6 +168,23 @@ export async function readWorkoutsFromHealth(
     return impl?.readWorkouts?.(startDate, endDate) ?? [];
   } catch (error) {
     console.warn('readWorkoutsFromHealth error:', error);
+    return [];
+  }
+}
+
+/**
+ * Read ALL workouts from health platform within a date range (any workout type)
+ * Used for display purposes - shows runs, walks, cycling, strength training, etc.
+ */
+export async function readAllWorkoutsFromHealth(
+  startDate: Date,
+  endDate: Date
+): Promise<HealthWorkout[]> {
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.readAllWorkouts?.(startDate, endDate) ?? [];
+  } catch (error) {
+    console.warn('readAllWorkoutsFromHealth error:', error);
     return [];
   }
 }
@@ -212,6 +233,23 @@ export async function writeCaloriesToHealth(
   } catch (error) {
     console.warn('writeCaloriesToHealth error:', error);
     return false;
+  }
+}
+
+/**
+ * Get total calories from ALL workout types in Apple Health
+ * Lightweight function for ranking - returns total + breakdown by workout type
+ */
+export async function getTotalWorkoutCaloriesFromHealth(
+  startDate: Date,
+  endDate: Date
+): Promise<WorkoutCaloriesSummary> {
+  try {
+    const impl = await getHealthSyncImpl();
+    return impl?.getTotalWorkoutCalories?.(startDate, endDate) ?? { total: 0, byType: {} };
+  } catch (error) {
+    console.warn('getTotalWorkoutCaloriesFromHealth error:', error);
+    return { total: 0, byType: {} };
   }
 }
 

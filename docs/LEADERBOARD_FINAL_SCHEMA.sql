@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS user_strength (
   -- Primary strength metrics
   total_score INTEGER NOT NULL DEFAULT 0,
   wilks_score REAL,
+  weekly_calories INTEGER,              -- Total calories from Apple Health workouts (all types) in last 7 days
   
   -- User profile data
   bodyweight_lbs REAL,
@@ -100,6 +101,20 @@ WHERE total_score > 0;
 CREATE INDEX IF NOT EXISTS idx_user_strength_wilks_range 
 ON user_strength(wilks_score DESC NULLS LAST)
 WHERE wilks_score IS NOT NULL;
+
+-- Weekly Calories Index (for calories leaderboard)
+CREATE INDEX IF NOT EXISTS idx_user_strength_weekly_calories 
+ON user_strength(weekly_calories DESC NULLS LAST);
+
+-- Weekly + Global + Calories
+CREATE INDEX IF NOT EXISTS idx_user_strength_calories_updated 
+ON user_strength(weekly_calories DESC NULLS LAST, updated_at DESC)
+WHERE weekly_calories IS NOT NULL;
+
+-- Weekly + Country + Calories
+CREATE INDEX IF NOT EXISTS idx_user_strength_country_calories_updated 
+ON user_strength(location_country, weekly_calories DESC NULLS LAST, updated_at DESC)
+WHERE location_country IS NOT NULL AND weekly_calories IS NOT NULL;
 
 -- 6. Setup Auto-Update Trigger
 CREATE OR REPLACE FUNCTION update_user_strength_updated_at()

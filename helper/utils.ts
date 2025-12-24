@@ -92,7 +92,99 @@ async function getMuscle1RM(muscleKey: string): Promise<number> {
     return 0; // Will trigger fallback in calculation
 }
 
-// --- Estimate muscle 1RM from exercise set using Epley formula ---
+// --- 1RM ESTIMATION FORMULAS ---
+// Multiple formulas for different rep ranges and accuracy
+
+/**
+ * Epley Formula: 1RM = Weight × (1 + Reps/30)
+ * Good for 1-10 reps, but overestimates at high reps
+ */
+function estimate1RM_Epley(weight: number, reps: number): number {
+    return weight * (1 + reps / 30);
+}
+
+/**
+ * Brzycki Formula: 1RM = Weight / (1.0278 - 0.0278 × Reps)
+ * Most accurate for 1-6 reps, underestimates at high reps
+ */
+function estimate1RM_Brzycki(weight: number, reps: number): number {
+    if (reps >= 37) return weight; // Prevent division by zero
+    return weight / (1.0278 - 0.0278 * reps);
+}
+
+/**
+ * Lombardi Formula: 1RM = Weight × Reps^0.10
+ * Excellent across all rep ranges
+ */
+function estimate1RM_Lombardi(weight: number, reps: number): number {
+    return weight * Math.pow(reps, 0.10);
+}
+
+/**
+ * Wathan Formula: 1RM = (100 × Weight) / (48.8 + 53.8 × e^(-0.075 × Reps))
+ * Most accurate overall, research-backed
+ */
+function estimate1RM_Wathan(weight: number, reps: number): number {
+    return (100 * weight) / (48.8 + 53.8 * Math.exp(-0.075 * reps));
+}
+
+/**
+ * Mayhew Formula: 1RM = (100 × Weight) / (52.2 + 41.9 × e^(-0.055 × Reps))
+ * Very accurate across wide rep range
+ */
+function estimate1RM_Mayhew(weight: number, reps: number): number {
+    return (100 * weight) / (52.2 + 41.9 * Math.exp(-0.055 * reps));
+}
+
+/**
+ * O'Conner Formula: 1RM = Weight × (1 + Reps/40)
+ * More conservative than Epley, less accurate
+ */
+function estimate1RM_OConner(weight: number, reps: number): number {
+    return weight * (1 + reps / 40);
+}
+
+/**
+ * Multi-Formula Approach: Selects best formula based on rep range
+ * Uses research-backed formula selection for maximum accuracy
+ */
+export function estimate1RM_MultiFormula(weight: number, reps: number): number {
+    // Clamp reps to valid range
+    const clampedReps = Math.max(1, Math.min(reps, 50));
+    
+    // Select formula based on rep range for optimal accuracy
+    if (clampedReps <= 3) {
+        // 1-3 reps: Brzycki is most accurate for near-max efforts
+        return estimate1RM_Brzycki(weight, clampedReps);
+    } else if (clampedReps <= 6) {
+        // 4-6 reps: Brzycki or Wathan (use Wathan for consistency)
+        return estimate1RM_Wathan(weight, clampedReps);
+    } else if (clampedReps <= 10) {
+        // 7-10 reps: Wathan or Epley (Wathan more accurate)
+        return estimate1RM_Wathan(weight, clampedReps);
+    } else if (clampedReps <= 15) {
+        // 11-15 reps: Wathan or Lombardi (Wathan preferred)
+        return estimate1RM_Wathan(weight, clampedReps);
+    } else {
+        // 16+ reps: Wathan or Lombardi (Wathan handles high reps well)
+        return estimate1RM_Wathan(weight, clampedReps);
+    }
+}
+
+/**
+ * Invert 1RM formula to predict reps possible at given weight
+ * Uses Wathan formula inversion for consistency
+ */
+export function predictRepsFrom1RM(oneRM: number, weight: number): number {
+    if (oneRM <= weight) return 0;
+    // Invert Wathan formula: reps = -ln((100*weight/oneRM - 48.8)/53.8) / 0.075
+    const ratio = (100 * weight) / oneRM;
+    if (ratio <= 48.8) return 0; // Can't do any reps
+    const reps = -Math.log((ratio - 48.8) / 53.8) / 0.075;
+    return Math.max(0, Math.floor(reps));
+}
+
+// --- Estimate muscle 1RM from exercise set using multi-formula approach ---
 function estimateMuscle1RMFromSet(
     exerciseName: string,
     weight: number,
@@ -102,8 +194,8 @@ function estimateMuscle1RMFromSet(
     const exercise = exercises.find((ex: Exercise) => ex.name === exerciseName);
     if (!exercise) return weight;
 
-    // Estimate exercise 1RM using Epley: 1RM = Weight * (1 + Reps / 30)
-    const exercise1RM = weight * (1 + reps / 30);
+    // Estimate exercise 1RM using multi-formula approach
+    const exercise1RM = estimate1RM_MultiFormula(weight, reps);
     
     // Find muscle involvement (handle normalized keys)
     let involvement = 0;
@@ -173,19 +265,41 @@ export async function calculateCapacityDrain(
     const effectiveWeight = await parseWeight(weightUsed);
     const exercise1RM = await getUserCapacityLimit(exerciseName);
 
+    // Check for custom muscle involvement override
+    let muscleInvolvement: Record<string, number> = exercise.muscles as unknown as Record<string, number>;
+    try {
+        const customInvolvement = await getPreference<Record<string, number>>(
+            `exerciseMuscleInvolvement_${exerciseName}`,
+            {}
+        );
+        if (customInvolvement && Object.keys(customInvolvement).length > 0) {
+            muscleInvolvement = customInvolvement;
+        }
+    } catch (error) {
+        // Fallback to default if error loading custom involvement
+        console.error('Error loading custom involvement:', error);
+    }
+
     const drain: MuscleCapacity = {};
 
     // Calculate drain for each involved muscle
-    for (const rawMuscle in exercise.muscles) {
-        if (!Object.prototype.hasOwnProperty.call(exercise.muscles, rawMuscle)) continue;
+    for (const rawMuscle in muscleInvolvement) {
+        if (!Object.prototype.hasOwnProperty.call(muscleInvolvement, rawMuscle)) continue;
 
         const muscleKey = normalizeMuscleKey(rawMuscle);
-        const involvement = exercise.muscles[rawMuscle as keyof typeof exercise.muscles] as number;
+        const involvement = muscleInvolvement[rawMuscle as keyof typeof muscleInvolvement] as number;
 
-        // Get muscle-specific 1RM (or estimate it)
+        // Get muscle-specific 1RM (or estimate it from exercise 1RM)
         let muscle1RM = await getMuscle1RM(muscleKey);
         if (muscle1RM <= 0) {
-            muscle1RM = estimateMuscle1RMFromSet(exerciseName, effectiveWeight, repsCompleted, muscleKey);
+            // Use exercise-level 1RM scaled by muscle involvement, rather than estimating from current set
+            // This ensures that changing weight actually changes the percentage of 1RM
+            if (exercise1RM > 0) {
+                muscle1RM = exercise1RM * involvement;
+            } else {
+                // Fallback: estimate from current set only if no exercise 1RM is available
+                muscle1RM = estimateMuscle1RMFromSet(exerciseName, effectiveWeight, repsCompleted, muscleKey);
+            }
         }
 
         // Calculate relative intensity (%1RM)
@@ -292,8 +406,8 @@ export async function predictRepsPossible(
     
     if (effectiveOneRM <= effectiveWeight) return 0;
 
-    // Invert Epley formula: reps = 30 * (1RM / weight - 1)
-    const repsPossible = Math.floor(30 * (effectiveOneRM / effectiveWeight - 1));
+    // Use Wathan formula inversion for consistent predictions
+    const repsPossible = predictRepsFrom1RM(effectiveOneRM, effectiveWeight);
     
     return Math.max(0, repsPossible);
 } 

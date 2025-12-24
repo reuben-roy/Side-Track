@@ -10,6 +10,7 @@ export interface HealthWorkout {
   date: string;
   duration?: number; // in seconds
   calories?: number;
+  workoutType?: string; // e.g., "Running", "Traditional Strength Training", "Cycling"
 }
 
 export interface HealthBodyMetrics {
@@ -40,5 +41,14 @@ export interface HealthSyncOptions {
   autoSync: boolean;
   syncOnWorkoutLog: boolean;
   syncOnProfileUpdate: boolean;
+}
+
+/**
+ * Summary of calories from all workout types
+ * Used for ranking purposes
+ */
+export interface WorkoutCaloriesSummary {
+  total: number;                    // Total calories from all workouts
+  byType: Record<string, number>;   // Calories broken down by workout type (e.g., "Running": 340)
 }
 

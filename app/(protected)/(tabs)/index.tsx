@@ -1,6 +1,7 @@
+import GoalsDisplay from '@/components/GoalsDisplay';
 import ProfileButton from '@/components/ProfileButton';
 import { getMuscleCapacity } from '@/lib/database';
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';
 import { useUserCapacity } from '../../../context/UserCapacityContext';
@@ -184,11 +185,16 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Header Section */}
       <View style={styles.headerRow}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={styles.header}>SideTrack</Text>
           <Text style={styles.subHeader}>Work Out till you Pass Out</Text>
         </View>
         <ProfileButton />
+      </View>
+
+      {/* Goals Section */}
+      <View style={styles.goalsSection}>
+        <GoalsDisplay />
       </View>
 
       {/* Title Section */}
@@ -367,7 +373,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: 24,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 12,
+  },
+  headerLeft: {
+    flex: 1,
   },
   header: {
     fontSize: 34,
@@ -382,9 +391,13 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     letterSpacing: 0.3,
   },
+  goalsSection: {
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
   titleContainer: {
     paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 16,
   },
   title: {
     fontSize: 17,

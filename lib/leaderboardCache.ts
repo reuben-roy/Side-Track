@@ -11,6 +11,7 @@ export interface LeaderboardEntry {
   username: string | null;
   total_score: number;
   wilks_score: number | null;
+  weekly_calories: number | null;  // Total calories from all workouts (Apple Health) in last 7 days
   bodyweight_lbs: number | null;
   gender: string | null;
   squat_1rm: number | null;
@@ -31,6 +32,7 @@ export const LEADERBOARD_SELECT_COLUMNS = `
   username,
   total_score,
   wilks_score,
+  weekly_calories,
   bodyweight_lbs,
   gender,
   squat_1rm,
@@ -42,7 +44,7 @@ export const LEADERBOARD_SELECT_COLUMNS = `
   updated_at
 `.trim();
 
-export type SortMode = 'total' | 'wilks';
+export type SortMode = 'total' | 'wilks' | 'calories';
 export type TimeFilter = 'all_time' | 'weekly';
 export type LocationFilter = 'global' | 'country';
 export type ScoreFilter = 'all' | 'similar';

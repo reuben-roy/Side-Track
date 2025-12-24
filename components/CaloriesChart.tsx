@@ -1,6 +1,6 @@
-import React from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { BarChart } from 'react-native-gifted-charts';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { LineChart } from 'react-native-gifted-charts';
 import { exercises } from '../constants/Exercises';
 
 interface WorkoutLog {
@@ -71,9 +71,12 @@ function getMonthDays(year: number, month: number) {
 }
 
 // Data preparation functions
-function calculateWeeklyCalories(workoutLogs: WorkoutLog[], profile: Profile) {
+function calculateWeeklyCalories(workoutLogs: WorkoutLog[], profile: Profile, weekOffset: number = 0) {
   const now = new Date();
-  const startOfWeek = getStartOfWeek(now);
+  // Calculate the start of the target week (0 = current week, 1 = last week, 2 = two weeks ago, etc.)
+  const targetDate = new Date(now);
+  targetDate.setDate(now.getDate() - (weekOffset * 7));
+  const startOfWeek = getStartOfWeek(targetDate);
   const weekDays = getWeekDays(startOfWeek);
   const weekCalories: { [key: string]: number } = {};
   
@@ -87,7 +90,7 @@ function calculateWeeklyCalories(workoutLogs: WorkoutLog[], profile: Profile) {
 
   workoutLogs.forEach(log => {
     const logDate = new Date(log.date);
-    // Only include logs from this week
+    // Only include logs from the target week
     if (logDate >= startOfWeek && logDate <= weekDays[6]) {
       const met = getExerciseMET(log.exercise);
       let durationMin = getSetCount(log) * 2;
@@ -97,7 +100,7 @@ function calculateWeeklyCalories(workoutLogs: WorkoutLog[], profile: Profile) {
     }
   });
 
-  return weekCalories;
+  return { weekCalories, startOfWeek, weekDays };
 }
 
 function calculateMonthlyCalories(workoutLogs: WorkoutLog[], profile: Profile) {
@@ -160,14 +163,20 @@ function calculateYearlyCalories(workoutLogs: WorkoutLog[], profile: Profile) {
 export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, onPeriodChange }: CaloriesChartProps) {
   const screenWidth = Dimensions.get('window').width;
   const totalHorizontalPadding = 64;
+  const [weekOffset, setWeekOffset] = useState(0);
+  const swipeStartX = useRef(0);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Chart dimensions for line charts
+  const availableWidth = screenWidth - totalHorizontalPadding * 2;
+  const weekDataPoints = 7;
+  const weekInitialSpacing = 20;
+  const weekSpacing = (availableWidth - weekInitialSpacing * 2) / (weekDataPoints - 1);
   
-  // Chart dimensions
-  const barWidth = 30;
-  const initialSpacing = 10;
-  const spacing = (screenWidth - totalHorizontalPadding * 2 - (barWidth * 7) - initialSpacing) / 7;
-  const yearBarInitialSpacing = 5;
-  const yearBarWidth = ((screenWidth - totalHorizontalPadding * 2 - yearBarInitialSpacing) * 4) / (5 * 12);
-  const yearBarSpacing = (screenWidth - totalHorizontalPadding * 2 - (yearBarWidth * 12) - yearBarInitialSpacing) / 11;
+  const yearDataPoints = 12;
+  const yearInitialSpacing = 10;
+  const yearSpacing = (availableWidth - yearInitialSpacing * 2) / (yearDataPoints - 1);
 
   // Button styling
   const buttonCount = 3;
@@ -183,11 +192,100 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
     };
   }
 
+  // Animation function for smooth transitions
+  // weekOffset: 0 = current week, 1 = last week, 2 = two weeks ago, etc.
+  const animateWeekChange = (newOffset: number) => {
+    const isGoingToPast = newOffset > weekOffset; // higher offset = further in past
+    const slideDistance = 40;
+    // Fade out and slide in direction of navigation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: isGoingToPast ? slideDistance : -slideDistance,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Update the offset
+      setWeekOffset(newOffset);
+      // Reset slide position from opposite direction
+      slideAnim.setValue(isGoingToPast ? -slideDistance : slideDistance);
+      // Fade in and slide back with spring for smoother feel
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 10,
+        }),
+      ]).start();
+    });
+  };
+
+  // PanResponder for swipe gestures
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => selectedPeriod === 'week',
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return selectedPeriod === 'week' && Math.abs(gestureState.dx) > 10;
+      },
+      onPanResponderGrant: (evt) => {
+        swipeStartX.current = evt.nativeEvent.pageX;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const swipeThreshold = 50;
+        const dx = gestureState.dx;
+
+        if (Math.abs(dx) > swipeThreshold) {
+          if (dx > 0) {
+            // Swipe right - go to older week (increase offset)
+            animateWeekChange(weekOffset + 1);
+          } else {
+            // Swipe left - go to more recent week (decrease offset, min 0 = current week)
+            if (weekOffset > 0) {
+              animateWeekChange(weekOffset - 1);
+            }
+          }
+        }
+      },
+    })
+  ).current;
+
+  // Helper function to format week date range
+  const formatWeekRange = (offset: number) => {
+    const now = new Date();
+    const targetDate = new Date(now);
+    targetDate.setDate(now.getDate() - (offset * 7));
+    const startOfWeek = getStartOfWeek(targetDate);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    
+    const startStr = startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endStr = endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    
+    if (offset === 0) {
+      return 'This Week';
+    } else if (offset === 1) {
+      return 'Last Week';
+    } else {
+      return `${startStr} - ${endStr}`;
+    }
+  };
+
   // Prepare data based on selected period
-  const weeklyCalories = calculateWeeklyCalories(workoutLogs, profile);
+  const { weekCalories, startOfWeek, weekDays } = calculateWeeklyCalories(workoutLogs, profile, weekOffset);
   const weekOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const barData = weekOrder.map(day => ({
-    value: weeklyCalories[day] || 0,
+    value: weekCalories[day] || 0,
     label: day,
     frontColor: '#000000',
     gradientColor: '#F2F2F7',
@@ -195,6 +293,15 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
 
   const { caloriesPerDay, monthDays, maxCals } = calculateMonthlyCalories(workoutLogs, profile);
   const yearBarData = calculateYearlyCalories(workoutLogs, profile);
+
+  // Reset week offset when period changes
+  useEffect(() => {
+    if (selectedPeriod !== 'week') {
+      setWeekOffset(0);
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+    }
+  }, [selectedPeriod]);
 
   return (
     <View style={styles.chartSection}>
@@ -213,29 +320,81 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
         ))}
       </View>
 
-      <Text style={styles.sectionTitle}>
-        {selectedPeriod === 'week' ? 'Calories Burned This Week' : selectedPeriod === 'month' ? 'Calories Burned This Month' : 'Calories Burned This Year'}
-      </Text>
+      <Animated.View style={{ opacity: fadeAnim }}>
+        <Text style={styles.sectionTitle}>
+          {selectedPeriod === 'week' 
+            ? `Calories Burned ${formatWeekRange(weekOffset)}` 
+            : selectedPeriod === 'month' 
+            ? 'Calories Burned This Month' 
+            : 'Calories Burned This Year'}
+        </Text>
+      </Animated.View>
 
       {/* Week Chart */}
       {selectedPeriod === 'week' && (
-        <BarChart
-          data={barData}
-          barWidth={30}
-          initialSpacing={initialSpacing}
-          spacing={spacing}
-          barBorderRadius={8}
-          // showGradient
-          yAxisThickness={0}
-          xAxisType={'dashed'}
-          xAxisColor={'#E5E5EA'}
-          yAxisTextStyle={{ color: '#8E8E93' }}
-          maxValue={Math.max(...barData.map(b => b.value), 100)}
-          noOfSections={4}
-          xAxisLabelTextStyle={{ color: '#8E8E93', textAlign: 'center', fontWeight: 'bold' }}
-          height={180}
-          disableScroll
-        />
+        <View {...panResponder.panHandlers} style={styles.swipeableContainer}>
+          {/* Swipe navigation indicator */}
+          <View style={styles.swipeIndicatorContainer}>
+            <TouchableOpacity 
+              onPress={() => animateWeekChange(weekOffset + 1)} 
+              style={styles.swipeArrowButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.swipeArrow}>‹</Text>
+            </TouchableOpacity>
+            <View style={styles.paginationDots}>
+              {[0, 1, 2].map((offset) => (
+                <View
+                  key={offset}
+                  style={[
+                    styles.paginationDot,
+                    weekOffset === offset && styles.paginationDotActive,
+                  ]}
+                />
+              ))}
+              {weekOffset > 2 && <View style={[styles.paginationDot, styles.paginationDotActive]} />}
+            </View>
+            <TouchableOpacity 
+              onPress={() => weekOffset > 0 && animateWeekChange(weekOffset - 1)} 
+              style={[styles.swipeArrowButton, weekOffset === 0 && styles.swipeArrowDisabled]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              disabled={weekOffset === 0}
+            >
+              <Text style={[styles.swipeArrow, weekOffset === 0 && styles.swipeArrowTextDisabled]}>›</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateX: slideAnim }],
+            }}
+          >
+            <LineChart
+              data={barData}
+              initialSpacing={weekInitialSpacing}
+              spacing={weekSpacing}
+              thickness={3}
+              color="#000000"
+              yAxisThickness={0}
+              xAxisType={'dashed'}
+              xAxisColor={'#E5E5EA'}
+              yAxisTextStyle={{ color: '#8E8E93' }}
+              maxValue={Math.max(...barData.map(b => b.value), 100)}
+              noOfSections={4}
+              xAxisLabelTextStyle={{ color: '#8E8E93', textAlign: 'center', fontWeight: 'bold' }}
+              height={180}
+              disableScroll
+              curved
+              areaChart
+              startFillColor="#000000"
+              endFillColor="#F2F2F7"
+              startOpacity={0.3}
+              endOpacity={0.1}
+              width={availableWidth}
+            />
+          </Animated.View>
+        </View>
       )}
 
       {/* Month Calendar */}
@@ -273,13 +432,12 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
 
       {/* Year Chart */}
       {selectedPeriod === 'year' && (
-        <BarChart
+        <LineChart
           data={yearBarData}
-          barWidth={yearBarWidth}
-          initialSpacing={yearBarInitialSpacing}
-          spacing={yearBarSpacing}
-          barBorderRadius={5}
-          // showGradient
+          initialSpacing={yearInitialSpacing}
+          spacing={yearSpacing}
+          thickness={3}
+          color="#000000"
           yAxisThickness={0}
           xAxisType={'dashed'}
           xAxisColor={'#E5E5EA'}
@@ -289,6 +447,13 @@ export default function CaloriesChart({ workoutLogs, profile, selectedPeriod, on
           xAxisLabelTextStyle={{ color: '#8E8E93', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}
           height={180}
           disableScroll
+          curved
+          areaChart
+          startFillColor="#000000"
+          endFillColor="#F2F2F7"
+          startOpacity={0.3}
+          endOpacity={0.1}
+          width={availableWidth}
         />
       )}
     </View>
@@ -380,5 +545,46 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontWeight: '700',
     marginTop: 2,
+  },
+  swipeableContainer: {
+    width: '100%',
+  },
+  swipeIndicatorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 16,
+  },
+  swipeArrowButton: {
+    padding: 4,
+  },
+  swipeArrow: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  swipeArrowDisabled: {
+    opacity: 0.3,
+  },
+  swipeArrowTextDisabled: {
+    color: '#C7C7CC',
+  },
+  paginationDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  paginationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#E5E5EA',
+  },
+  paginationDotActive: {
+    backgroundColor: '#000000',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });

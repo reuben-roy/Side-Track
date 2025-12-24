@@ -8,9 +8,11 @@ import {
   saveAllExerciseLimits,
   saveExerciseLimit,
 } from '@/lib/database';
+import { getTotalWorkoutCaloriesFromHealth } from '@/lib/healthSync';
 import { invalidateCache } from '@/lib/leaderboardCache';
 import { supabase } from '@/lib/supabase';
-import { generateUsername, generateUsernameFromProfile } from '@/helper/username';
+import { generateUsernameFromProfile } from '@/helper/username';
+import { estimate1RM_MultiFormula } from '@/helper/utils';
 import React, { createContext, ReactNode, useContext, useEffect, useState, useRef } from 'react';
 // import { useAuth } from './AuthContext'; // OLD: Custom OAuth
 import { useSupabaseAuth } from './SupabaseAuthContext'; // NEW: Supabase Auth
@@ -161,6 +163,11 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
       // Get individual lift PRs
       const liftPRs = getCoreLiftPRs(capacityLimits);
 
+      // Fetch weekly calories from Apple Health (all workout types)
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const { total: weeklyCalories } = await getTotalWorkoutCaloriesFromHealth(oneWeekAgo, new Date());
+
       // Upsert to Supabase (use user_id for conflict resolution since it has the unique constraint)
       const { error } = await supabase
         .from('user_strength')
@@ -169,6 +176,7 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
           username: username,
           total_score: totalScore,
           wilks_score: wilksScore,
+          weekly_calories: weeklyCalories > 0 ? weeklyCalories : null,
           bodyweight_lbs: bodyweight,
           gender: validGender,
           ...liftPRs,
@@ -178,7 +186,7 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
       if (error) {
         console.error('Failed to sync strength score:', error);
       } else {
-        console.log('✅ Strength score synced:', totalScore, 'lbs (Wilks:', wilksScore, ')');
+        console.log('✅ Strength score synced:', totalScore, 'lbs (Wilks:', wilksScore, ', Weekly Cal:', weeklyCalories, ')');
         // Invalidate leaderboard cache so user sees their updated rank when they visit leaderboard
         invalidateCache();
       }
@@ -221,7 +229,7 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
 
   /**
    * Automatically update 1RM estimate based on workout performance.
-   * Uses Epley formula: 1RM = Weight × (1 + Reps/30)
+   * Uses multi-formula approach for maximum accuracy across all rep ranges.
    * Only updates if the calculated 1RM is higher than current estimate.
    * @returns true if a new PR was set, false otherwise
    */
@@ -231,8 +239,9 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
     reps: number
   ): Promise<boolean> => {
     try {
-      // Calculate estimated 1RM using Epley formula
-      const estimated1RM = Math.round(weight * (1 + reps / 30));
+      // Calculate estimated 1RM using multi-formula approach
+      // Automatically selects best formula based on rep range (1-3: Brzycki, 4+: Wathan)
+      const estimated1RM = Math.round(estimate1RM_MultiFormula(weight, reps));
       
       const currentLimit = capacityLimits[exerciseName] || DEFAULT_CAPACITY_LIMITS[exerciseName] || 0;
       
@@ -268,7 +277,8 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
       
       logs.forEach((log) => {
         if (log.exercise && typeof log.weight === 'number' && typeof log.reps === 'number') {
-          const estimated1RM = Math.round(log.weight * (1 + log.reps / 30));
+          // Use multi-formula approach for accurate estimation across all rep ranges
+          const estimated1RM = Math.round(estimate1RM_MultiFormula(log.weight, log.reps));
           
           if (!bestPerformance[log.exercise] || estimated1RM > bestPerformance[log.exercise]) {
             bestPerformance[log.exercise] = estimated1RM;

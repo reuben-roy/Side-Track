@@ -23,6 +23,21 @@ const SYNC_PREFERENCES_KEY = 'healthSyncOptions';
 const LAST_SYNC_DATE_KEY = 'healthLastSyncDate';
 
 /**
+ * Session-based workout buffer
+ * Aggregates sets during a workout session and syncs as one workout to Apple Health
+ */
+interface PendingWorkoutSet {
+  exercise: string;
+  weight: number;
+  reps: number;
+  timestamp: Date;
+}
+
+// In-memory buffer for current session
+let pendingWorkoutSets: PendingWorkoutSet[] = [];
+let sessionStartTime: Date | null = null;
+
+/**
  * Get health sync preferences
  */
 export async function getHealthSyncOptions(): Promise<HealthSyncOptions> {
@@ -180,22 +195,69 @@ function convertWorkoutLogToHealth(
 }
 
 /**
- * Sync a single workout to health platform
+ * Add a workout set to the session buffer (does NOT sync immediately)
+ * Call flushWorkoutSession() when the workout session ends
  */
-export async function syncWorkoutToHealth(
+export function addWorkoutToSession(
   exercise: string,
   weight: number,
   reps: number
-): Promise<boolean> {
+): void {
+  const now = new Date();
+  
+  // Start session if this is the first set
+  if (!sessionStartTime) {
+    sessionStartTime = now;
+  }
+  
+  pendingWorkoutSets.push({
+    exercise,
+    weight,
+    reps,
+    timestamp: now,
+  });
+  
+  console.log(`Added to session buffer: ${exercise} ${weight}lbs x${reps} (${pendingWorkoutSets.length} sets buffered)`);
+}
+
+/**
+ * Get the number of sets currently in the buffer
+ */
+export function getPendingSetCount(): number {
+  return pendingWorkoutSets.length;
+}
+
+/**
+ * Clear the session buffer without syncing
+ */
+export function clearWorkoutSession(): void {
+  pendingWorkoutSets = [];
+  sessionStartTime = null;
+  console.log('Workout session buffer cleared');
+}
+
+/**
+ * Flush the workout session - aggregate all sets and sync as ONE workout to Apple Health
+ * Call this when the workout screen closes or app backgrounds
+ */
+export async function flushWorkoutSession(): Promise<boolean> {
+  if (pendingWorkoutSets.length === 0) {
+    console.log('No pending sets to sync');
+    return true;
+  }
+  
   try {
     const options = await getHealthSyncOptions();
     if (!options.syncOnWorkoutLog) {
-      return false; // Auto-sync disabled
+      console.log('Health sync disabled, clearing buffer');
+      clearWorkoutSession();
+      return false;
     }
 
     const status = await getHealthSyncStatus();
     if (!status.isAuthorized) {
-      console.warn('Health platform not authorized, skipping sync');
+      console.warn('Health platform not authorized, clearing buffer');
+      clearWorkoutSession();
       return false;
     }
 
@@ -204,25 +266,107 @@ export async function syncWorkoutToHealth(
       ? parseFloat(profile.weight.match(/(\d+\.?\d*)/)?.[1] || '170')
       : 170;
 
-    const duration = estimateWorkoutDuration(exercise, reps);
-    const healthWorkout: HealthWorkout = {
-      exercise,
-      weight,
-      reps,
-      date: new Date().toISOString(),
-      duration,
-      calories: calculateWorkoutCalories(exercise, weight, reps, profileWeightLbs),
-    };
-
-    const success = await writeWorkoutToHealth(healthWorkout);
+    // Aggregate all sets into one workout
+    const aggregatedWorkout = aggregateSessionSets(pendingWorkoutSets, profileWeightLbs);
+    
+    console.log(`Syncing aggregated workout: ${aggregatedWorkout.exercise} - ${pendingWorkoutSets.length} sets, ${Math.round(aggregatedWorkout.duration! / 60)} min, ${aggregatedWorkout.calories} cal`);
+    
+    const success = await writeWorkoutToHealth(aggregatedWorkout);
     if (success) {
       await updateLastSyncDate();
+      console.log('Successfully synced aggregated workout to Apple Health');
     }
+    
+    // Clear buffer regardless of success (don't want to re-sync on failure)
+    clearWorkoutSession();
+    
     return success;
   } catch (error) {
-    console.error('Error syncing workout to health:', error);
+    console.error('Error flushing workout session:', error);
+    clearWorkoutSession();
     return false;
   }
+}
+
+/**
+ * Aggregate multiple sets into a single workout entry
+ */
+function aggregateSessionSets(
+  sets: PendingWorkoutSet[],
+  profileWeightLbs: number
+): HealthWorkout {
+  if (sets.length === 0) {
+    throw new Error('Cannot aggregate empty sets array');
+  }
+
+  // Find start and end times
+  const sortedSets = [...sets].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  const firstSet = sortedSets[0];
+  const lastSet = sortedSets[sortedSets.length - 1];
+  
+  // Calculate total calories and estimate total duration
+  let totalCalories = 0;
+  let totalDuration = 0;
+  
+  // Group sets by exercise for metadata
+  const exerciseSummary: Record<string, { sets: number; totalReps: number; maxWeight: number }> = {};
+  
+  for (const set of sets) {
+    // Add calories for this set
+    totalCalories += calculateWorkoutCalories(set.exercise, set.weight, set.reps, profileWeightLbs);
+    
+    // Add duration for this set
+    totalDuration += estimateWorkoutDuration(set.exercise, set.reps);
+    
+    // Track exercise summary
+    if (!exerciseSummary[set.exercise]) {
+      exerciseSummary[set.exercise] = { sets: 0, totalReps: 0, maxWeight: 0 };
+    }
+    exerciseSummary[set.exercise].sets++;
+    exerciseSummary[set.exercise].totalReps += set.reps;
+    exerciseSummary[set.exercise].maxWeight = Math.max(exerciseSummary[set.exercise].maxWeight, set.weight);
+  }
+  
+  // Calculate actual session duration (time from first to last set + last set's duration)
+  const lastSetDuration = estimateWorkoutDuration(lastSet.exercise, lastSet.reps);
+  const sessionDuration = Math.max(
+    totalDuration,
+    (lastSet.timestamp.getTime() - firstSet.timestamp.getTime()) / 1000 + lastSetDuration
+  );
+  
+  // Create exercise summary string for metadata
+  const exerciseList = Object.entries(exerciseSummary)
+    .map(([ex, data]) => `${ex}: ${data.sets}x (${data.maxWeight}lbs)`)
+    .join(', ');
+  
+  // Use the most common exercise as the primary, or just list count
+  const exerciseNames = Object.keys(exerciseSummary);
+  const primaryExercise = exerciseNames.length === 1 
+    ? exerciseNames[0] 
+    : `${sets.length} sets (${exerciseNames.length} exercises)`;
+  
+  return {
+    exercise: primaryExercise,
+    weight: Math.max(...sets.map(s => s.weight)),  // Max weight used
+    reps: sets.reduce((sum, s) => sum + s.reps, 0),  // Total reps
+    date: firstSet.timestamp.toISOString(),
+    duration: Math.round(sessionDuration),
+    calories: totalCalories,
+  };
+}
+
+/**
+ * Sync a single workout to health platform (DEPRECATED - use session-based sync)
+ * Kept for backwards compatibility but now just adds to session buffer
+ */
+export async function syncWorkoutToHealth(
+  exercise: string,
+  weight: number,
+  reps: number
+): Promise<boolean> {
+  // Add to session buffer instead of syncing immediately
+  addWorkoutToSession(exercise, weight, reps);
+  return true; // Always return true since we're just buffering
 }
 
 /**

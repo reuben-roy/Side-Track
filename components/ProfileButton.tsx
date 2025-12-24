@@ -139,7 +139,10 @@ export default function ProfileButton({ top, right }: ProfileButtonProps) {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Profile</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <TouchableOpacity 
+                onPress={() => setModalVisible(false)}
+                style={{ padding: 12, minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}
+              >
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
             </View>

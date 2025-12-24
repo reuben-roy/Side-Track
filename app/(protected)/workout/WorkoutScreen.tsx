@@ -1,15 +1,18 @@
 import SlotPicker from '@/components/SlotPicker';
+import MuscleInvolvementEditor from '@/components/MuscleInvolvementEditor';
 import { useProfile } from '@/context/ProfileContext';
 import { useUserCapacity } from '@/context/UserCapacityContext';
 import {
   addWorkoutLog,
   getExerciseStats as getDBExerciseStats,
   getMuscleCapacity,
+  getWorkoutLogsByExercise,
   updateAllMuscleCapacity,
+  getPreference,
 } from '@/lib/database';
-import { syncWorkoutToHealth } from '@/lib/healthSyncHelper';
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { flushWorkoutSession, getPendingSetCount, syncWorkoutToHealth } from '@/lib/healthSyncHelper';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { exercises, maxMuscleCapacity } from '../../../constants/Exercises';
 import { muscleGroups } from '../../../constants/MuscleGroups';
 import { calculateCapacityDrain } from '../../../helper/utils';
@@ -64,6 +67,8 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
   const [muscleCapacity, setMuscleCapacity] = useState<Record<string, number>>({});
   const [predictedDrain, setPredictedDrain] = useState<Record<string, number>>({});
   const [currentTab, setCurrentTab] = useState<'workout' | 'muscles'>('workout');
+  const [showInvolvementEditor, setShowInvolvementEditor] = useState(false);
+  const [customMuscleInvolvement, setCustomMuscleInvolvement] = useState<Record<string, number> | null>(null);
   const [exerciseStats, setExerciseStats] = useState<ExerciseStats>({
     estimated1RM: 0,
     maxWeight: 0,
@@ -72,16 +77,87 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
     lastWorkoutDate: null,
   });
 
-  // Fetch exercise statistics on component mount
+  // Track app state for flushing workout session on background
+  const appState = useRef(AppState.currentState);
+
+  // Fetch exercise statistics and today's sets on component mount
   useEffect(() => {
     fetchExerciseStats();
     loadMuscleCapacity();
+    loadTodaysSets();
+    loadCustomInvolvement();
   }, [exercise]);
 
-  // Recalculate predicted drain when weight or reps change
+  const loadCustomInvolvement = async () => {
+    try {
+      const custom = await getPreference<Record<string, number>>(
+        `exerciseMuscleInvolvement_${exercise}`,
+        null
+      );
+      setCustomMuscleInvolvement(custom);
+    } catch (error) {
+      console.error('Error loading custom involvement:', error);
+      setCustomMuscleInvolvement(null);
+    }
+  };
+
+  const loadTodaysSets = async () => {
+    try {
+      const logs = await getWorkoutLogsByExercise(exercise);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const todaysLogs = logs.filter(log => {
+        const logDate = new Date(log.date);
+        logDate.setHours(0, 0, 0, 0);
+        return logDate.getTime() === today.getTime();
+      });
+      
+      // Convert to CompletedSet format (logs are already in DESC order, reverse to get chronological)
+      const sets: CompletedSet[] = todaysLogs.reverse().map(log => ({
+        weight: log.weight,
+        reps: log.reps,
+        timestamp: new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }));
+      
+      setCompletedSets(sets);
+    } catch (error) {
+      console.error('Error loading today\'s sets:', error);
+    }
+  };
+
+  // Flush workout session to Apple Health when app goes to background
   useEffect(() => {
-    updatePredictedDrain();
-  }, [weightIdx, repsIdx, muscleCapacity]);
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
+        // App is going to background - flush the workout session
+        console.log('App backgrounding - flushing workout session...');
+        try {
+          await flushWorkoutSession();
+        } catch (error) {
+          console.error('Error flushing workout session on background:', error);
+        }
+      }
+      appState.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, []);
+
+  // Handle screen close - flush session and call original onClose
+  const handleClose = useCallback(async () => {
+    const pendingCount = getPendingSetCount();
+    if (pendingCount > 0) {
+      console.log(`Closing workout screen - flushing ${pendingCount} pending sets...`);
+      try {
+        await flushWorkoutSession();
+      } catch (error) {
+        console.error('Error flushing workout session on close:', error);
+      }
+    }
+    onClose();
+  }, [onClose]);
 
   const loadMuscleCapacity = async () => {
     try {
@@ -93,35 +169,83 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
     }
   };
 
-  const updatePredictedDrain = async () => {
+  // Helper function to calculate actual weight from selected weight string
+  const calculateActualWeight = (selectedWeight: string | number): number => {
+    const profileWeight = parseInt(profile?.weight || '0', 10);
+    
+    if (typeof selectedWeight === 'string') {
+      if (selectedWeight === 'Bodyweight') {
+        return profileWeight;
+      } else if (selectedWeight.startsWith('+')) {
+        const additionalWeight = parseInt(selectedWeight.substring(1), 10);
+        return profileWeight + additionalWeight;
+      } else if (selectedWeight.startsWith('-')) {
+        const additionalWeight = parseInt(selectedWeight.substring(1), 10);
+        return Math.max(0, profileWeight - additionalWeight);
+      } else {
+        // Try to parse number from string like "135 lbs"
+        const parsed = parseInt(selectedWeight.split(" ")[0], 10);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+    }
+    return typeof selectedWeight === 'number' ? selectedWeight : 0;
+  };
+
+  // Helper function to format weight for display
+  const formatWeightForDisplay = (selectedWeight: string | number): string => {
+    const profileWeight = parseInt(profile?.weight || '0', 10);
+    
+    if (typeof selectedWeight === 'string') {
+      if (selectedWeight === 'Bodyweight') {
+        return `${profileWeight} lbs`;
+      } else if (selectedWeight.startsWith('+')) {
+        const additionalWeight = parseInt(selectedWeight.substring(1), 10);
+        return `${profileWeight + additionalWeight} lbs`;
+      } else if (selectedWeight.startsWith('-')) {
+        const additionalWeight = parseInt(selectedWeight.substring(1), 10);
+        return `${Math.max(0, profileWeight - additionalWeight)} lbs`;
+      } else if (selectedWeight.includes(' lbs')) {
+        // Already formatted, return as-is
+        return selectedWeight;
+      } else {
+        // Try to parse as number
+        const parsed = parseInt(selectedWeight.split(" ")[0], 10);
+        return isNaN(parsed) ? selectedWeight : `${parsed} lbs`;
+      }
+    }
+    // It's a number
+    return `${selectedWeight} lbs`;
+  };
+
+  const updatePredictedDrain = useCallback(async () => {
     if (!exerciseObj) return;
 
-    const currentWeight = parseInt(weights[weightIdx].split(" ")[0], 10);
-    const currentReps = parseInt(repsList[repsIdx].split(" ")[0]);
-    const profileWeight = parseInt(profile?.weight || '0', 10);
-    const selectedWeight = weights[weightIdx];
+    const currentReps = parseInt(repsList[repsIdx].split(" ")[0], 10);
+    const selectedWeight = exerciseObj.weights[weightIdx];
+    const actualWeight = calculateActualWeight(selectedWeight);
 
-    let actualWeight: number;
-    if (selectedWeight === 'Bodyweight') {
-      actualWeight = profileWeight;
-    } else if (selectedWeight.startsWith('+')) {
-      const additionalWeight = parseInt(selectedWeight.substring(1));
-      actualWeight = profileWeight + additionalWeight;
-    } else if (selectedWeight.startsWith('-')) {
-      const additionalWeight = parseInt(selectedWeight.substring(1));
-      actualWeight = profileWeight - additionalWeight;
-    } else {
-      actualWeight = currentWeight;
-    }
+    console.log('=== PREDICTED DRAIN DEBUG ===');
+    console.log('Selected weight (raw):', selectedWeight);
+    console.log('Actual weight calculated:', actualWeight);
+    console.log('Reps:', currentReps);
+    console.log('Profile weight:', profile?.weight);
+    console.log('Exercise:', exercise);
 
     try {
       const drain = await calculateCapacityDrain(exercise, actualWeight, currentReps);
+      console.log('Calculated drain:', drain);
       setPredictedDrain(drain);
     } catch (error) {
       console.error('Error calculating predicted drain:', error);
       setPredictedDrain({});
     }
-  };
+    console.log('=== END DEBUG ===');
+  }, [exercise, exerciseObj, weightIdx, repsIdx, profile?.weight]);
+
+  // Recalculate predicted drain when weight or reps change
+  useEffect(() => {
+    updatePredictedDrain();
+  }, [updatePredictedDrain, muscleCapacity]);
 
   const fetchExerciseStats = async () => {
     try {
@@ -140,26 +264,9 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
 
   const logExercise = async () => {
     setLogging(true);
-    const currentWeight = parseInt(weights[weightIdx].split(" ")[0], 10);
-    const currentReps = parseInt(repsList[repsIdx].split(" ")[0]);
-
-    let actualWeight: number;
-    const selectedWeight = weights[weightIdx];
-    const profileWeight = parseInt(profile?.weight || '0', 10);
-    
-    if (selectedWeight === 'Bodyweight') {
-      actualWeight = profileWeight;
-    } else if (selectedWeight.startsWith('+')) {
-      // Handle +10, +20, +30 etc as bodyweight + additional weight
-      const additionalWeight = parseInt(selectedWeight.substring(1));
-      actualWeight = profileWeight + additionalWeight;
-    } else if (selectedWeight.startsWith('-')) {
-      // Handle -10, -20, -30 etc as bodyweight - additional weight
-      const additionalWeight = parseInt(selectedWeight.substring(1));
-      actualWeight = profileWeight - additionalWeight;
-    } else {
-      actualWeight = currentWeight;
-    }
+    const currentReps = parseInt(repsList[repsIdx].split(" ")[0], 10);
+    const selectedWeight = exerciseObj?.weights[weightIdx] || weights[weightIdx];
+    const actualWeight = calculateActualWeight(selectedWeight);
     
     // Add to completed sets first
     const newSet: CompletedSet = {
@@ -249,6 +356,9 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     
+    // Handle negative days (date in future - likely timezone/clock issue)
+    if (diffDays < 0) return 'Today';
+    
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
@@ -287,7 +397,10 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
   const getMusclesEngaged = () => {
     if (!exerciseObj || !exerciseObj.muscles) return [];
     
-    return Object.entries(exerciseObj.muscles)
+    // Use custom involvement if available, otherwise use default
+    const involvementData = customMuscleInvolvement || exerciseObj.muscles;
+    
+    return Object.entries(involvementData)
       .sort(([, a], [, b]) => b - a) // Sort by involvement percentage (highest first)
       .map(([muscle, involvement]) => ({
         name: muscle,
@@ -297,13 +410,19 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
       }));
   };
 
+  const handleInvolvementSave = async (newInvolvement: Record<string, number>) => {
+    setCustomMuscleInvolvement(newInvolvement);
+    // Recalculate predicted drain with new involvement
+    await updatePredictedDrain();
+  };
+
   const switchToTab = (tab: 'workout' | 'muscles') => {
     setCurrentTab(tab);
   };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.close} onPress={onClose}>
+      <TouchableOpacity style={styles.close} onPress={handleClose}>
         <Text style={{ fontSize: 32, color: '#181C20' }}>×</Text>
       </TouchableOpacity>
       <Text style={styles.header}>{exercise}Log Workout</Text>
@@ -338,15 +457,18 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
               <View style={styles.setsContainer}>
                 <Text style={styles.setsTitle}>Completed Sets</Text>
                 <View style={styles.setsList}>
-                  {completedSets.map((set, index) => (
-                    <View key={index} style={styles.setItem}>
-                      <Text style={styles.setNumber}>Set {index + 1}</Text>
-                      <Text style={styles.setDetails}>
-                        {set.weight} lbs × {set.reps} reps
-                      </Text>
-                      <Text style={styles.setTime}>{set.timestamp}</Text>
-                    </View>
-                  ))}
+                  {[...completedSets].reverse().map((set, index) => {
+                    const setNumber = completedSets.length - index;
+                    return (
+                      <View key={setNumber} style={styles.setItem}>
+                        <Text style={styles.setNumber}>Set {setNumber}</Text>
+                        <Text style={styles.setDetails}>
+                          {set.weight} lbs × {set.reps} reps
+                        </Text>
+                        <Text style={styles.setTime}>{set.timestamp}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             )}
@@ -408,11 +530,20 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
             </View>
           </View>
 
-          <View style={styles.muscleEngagementContainer}>
-            <Text style={styles.muscleEngagementTitle}>Muscles Engaged</Text>
-            <Text style={styles.muscleEngagementSubtitle}>
-              Based on {weights[weightIdx]} × {repsList[repsIdx]}
-            </Text>
+          <TouchableOpacity
+            style={styles.muscleEngagementContainer}
+            onPress={() => setShowInvolvementEditor(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.muscleEngagementHeader}>
+              <View>
+                <Text style={styles.muscleEngagementTitle}>Muscles Engaged</Text>
+                <Text style={styles.muscleEngagementSubtitle}>
+                  Based on {formatWeightForDisplay(exerciseObj?.weights[weightIdx] || weights[weightIdx])} × {repsList[repsIdx]}
+                </Text>
+              </View>
+              <Text style={styles.editHint}>Tap to edit</Text>
+            </View>
             {getMusclesEngaged().map((muscle) => (
               <View key={muscle.name} style={styles.muscleRow}>
                 <View style={styles.muscleInfo}>
@@ -441,19 +572,32 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
                     />
                   </View>
                   <View style={styles.capacityNumbers}>
-                    <Text style={[styles.capacityText, { color: getCapacityColor(muscle.currentCapacity) }]}>
-                      {muscle.currentCapacity.toFixed(0)}%
-                    </Text>
+                    <View style={styles.capacityLabelContainer}>
+                      <Text style={styles.capacityLabel}>Remaining</Text>
+                      <Text style={[styles.capacityText, { color: getCapacityColor(muscle.currentCapacity) }]}>
+                        {muscle.currentCapacity.toFixed(0)}%
+                      </Text>
+                    </View>
                     {muscle.predictedDrain > 0 && (
-                      <Text style={styles.drainText}>-{muscle.predictedDrain.toFixed(1)}</Text>
+                      <View style={styles.drainLabelContainer}>
+                        <Text style={styles.drainLabel}>Drain</Text>
+                        <Text style={styles.drainText}>-{muscle.predictedDrain.toFixed(1)}%</Text>
+                      </View>
                     )}
                   </View>
                 </View>
               </View>
             ))}
-          </View>
+          </TouchableOpacity>
         </ScrollView>
       )}
+
+      <MuscleInvolvementEditor
+        exerciseName={exercise}
+        visible={showInvolvementEditor}
+        onClose={() => setShowInvolvementEditor(false)}
+        onSave={handleInvolvementSave}
+      />
 
       {showToast && (
         <View style={styles.toast}>
@@ -485,7 +629,11 @@ const styles = StyleSheet.create({
     left: 24,
     top: 24,
     zIndex: 10,
-    padding: 8,
+    padding: 16,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -737,18 +885,26 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
   },
+  muscleEngagementHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   muscleEngagementTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#000000',
     marginBottom: 4,
-    textAlign: 'center',
   },
   muscleEngagementSubtitle: {
     fontSize: 13,
     color: '#8E8E93',
-    marginBottom: 16,
-    textAlign: 'center',
+  },
+  editHint: {
+    fontSize: 12,
+    color: '#FF3B30',
+    fontWeight: '500',
   },
   muscleRow: {
     marginBottom: 12,
@@ -800,9 +956,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  capacityLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  capacityLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+  },
   capacityText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  drainLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  drainLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
   },
   drainText: {
     fontSize: 12,

@@ -80,11 +80,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   closeButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    minWidth: 44,
+    minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: -8,
+    padding: 8,
   },
   closeButtonText: {
     fontSize: 32,

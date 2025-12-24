@@ -148,6 +148,9 @@ export default function HealthSettingsScreen() {
     const diffMs = now.getTime() - lastSyncDate.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     
+    // Handle negative values (date in future - likely timezone/clock issue)
+    if (diffMins < 0) return 'Just now';
+    
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} minutes ago`;
     const diffHours = Math.floor(diffMins / 60);
@@ -319,11 +322,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   closeButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    minWidth: 44,
+    minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: -8,
+    padding: 8,
   },
   closeButtonText: {
     fontSize: 32,
