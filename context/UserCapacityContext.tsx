@@ -9,6 +9,7 @@ import {
   saveExerciseLimit,
 } from '@/lib/database';
 import { getTotalWorkoutCaloriesFromHealth } from '@/lib/healthSync';
+import { calculateWeeklyCaloriesFromLogs, flushWorkoutSession } from '@/lib/healthSyncHelper';
 import { invalidateCache } from '@/lib/leaderboardCache';
 import { supabase } from '@/lib/supabase';
 import { generateUsernameFromProfile } from '@/helper/username';
@@ -31,6 +32,7 @@ interface UserCapacityContextType {
   updateCapacityFromWorkout: (exerciseName: string, weight: number, reps: number) => Promise<boolean>;
   estimateFromAllWorkouts: () => Promise<number>;
   resetToDefaults: () => Promise<void>;
+  syncStrengthToSupabase: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -97,7 +99,7 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
   // Debounced sync strength score to Supabase whenever capacity limits change
   // This batches multiple updates (even longer sequences) into a single API call
   // Debounce duration is configurable via EXPO_PUBLIC_SYNC_DEBOUNCE_MS env variable
-  // Default: 10 seconds - batches all updates within 10 seconds into one API call
+  // Default: 5 minutes - reduces server load, syncs happen on workout close/app background
   useEffect(() => {
     if (user && !isLoading) {
       // Clear any pending sync
@@ -111,10 +113,10 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
       // Debounce: wait for configured duration after last change before syncing
       // This batches multiple updates (even longer sequences) into a single Supabase call
       // Set EXPO_PUBLIC_SYNC_DEBOUNCE_MS in your .env file to customize
-      // Example: EXPO_PUBLIC_SYNC_DEBOUNCE_MS=15000 (15 seconds)
+      // Example: EXPO_PUBLIC_SYNC_DEBOUNCE_MS=300000 (5 minutes)
       const debounceMs = process.env.EXPO_PUBLIC_SYNC_DEBOUNCE_MS
         ? parseInt(process.env.EXPO_PUBLIC_SYNC_DEBOUNCE_MS, 10)
-        : 10 * 1000; // Default: 10 seconds
+        : 5 * 60 * 1000; // Default: 5 minutes (reduced frequency)
       
       syncTimeoutRef.current = setTimeout(() => {
         if (pendingSyncRef.current) {
@@ -163,10 +165,54 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
       // Get individual lift PRs
       const liftPRs = getCoreLiftPRs(capacityLimits);
 
-      // Fetch weekly calories from Apple Health (all workout types)
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      const { total: weeklyCalories } = await getTotalWorkoutCaloriesFromHealth(oneWeekAgo, new Date());
+      // Fetch weekly calories - try Apple Health first, fallback to app's workout logs
+      // Use Monday-based week (Monday to now) for consistency with goals
+      const now = new Date();
+      // Import getStartOfWeek from healthSyncHelper to ensure consistency
+      const getStartOfWeek = (date: Date): Date => {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust so Monday is day 1
+        d.setDate(diff);
+        d.setHours(0, 0, 0, 0); // Set to start of day
+        return d;
+      };
+      const weekStart = getStartOfWeek(now);
+      console.log(`📅 Week calculation - Now: ${now.toISOString()}, WeekStart (Monday): ${weekStart.toISOString()}`);
+      
+      // Ensure any pending workouts are flushed to Health before reading
+      // Also wait a moment to ensure workout logs are fully saved to database
+      try {
+        await flushWorkoutSession();
+        // Small delay to ensure workout is fully saved before calculating calories
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (flushError) {
+        // Silently fail - flushing is best effort
+        console.log('Note: Could not flush workout session before syncing calories:', flushError);
+        // Still wait a bit even if flush failed, to ensure DB writes are complete
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
+      let weeklyCalories = 0;
+      try {
+        // First, try to get calories from Apple Health (includes all workout types)
+        // Use Monday-based week for consistency
+        const healthCalories = await getTotalWorkoutCaloriesFromHealth(weekStart, now);
+        weeklyCalories = healthCalories.total || 0;
+        console.log(`🏥 Health calories: ${weeklyCalories} cal`);
+        
+        // If Health returns 0 or isn't available, fallback to calculating from app's workout logs
+        if (weeklyCalories === 0) {
+          console.log('⚠️ Health calories returned 0, calculating from app logs...');
+          weeklyCalories = await calculateWeeklyCaloriesFromLogs(weekStart, now);
+        }
+      } catch (healthError) {
+        // If Health read fails, fallback to app's workout logs
+        console.log('⚠️ Health read failed, calculating from app logs:', healthError);
+        weeklyCalories = await calculateWeeklyCaloriesFromLogs(weekStart, now);
+      }
+      
+      console.log(`✅ Final weekly calories to sync: ${weeklyCalories} cal (Monday ${weekStart.toLocaleDateString()} to ${now.toLocaleDateString()})`);
 
       // Upsert to Supabase (use user_id for conflict resolution since it has the unique constraint)
       const { error } = await supabase
@@ -330,6 +376,7 @@ export const UserCapacityProvider: React.FC<UserCapacityProviderProps> = ({ chil
         updateCapacityFromWorkout,
         estimateFromAllWorkouts,
         resetToDefaults,
+        syncStrengthToSupabase,
         isLoading 
       }}
     >

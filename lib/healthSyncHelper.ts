@@ -4,20 +4,17 @@
  * Helper functions to integrate health sync with Side-Track's database
  */
 
-import { getPreference, setPreference } from './database';
-import { getProfile, getWorkoutLogs } from './database';
 import { exercises } from '../constants/Exercises';
+import type { HealthBodyMetrics, HealthSyncOptions, HealthWorkout } from '../types/health';
+import { getPreference, getProfile, getWorkoutLogs, setPreference } from './database';
 import {
-  writeWorkoutToHealth,
-  writeWorkoutsToHealth,
+  getHealthSyncStatus,
   readWorkoutsFromHealth,
   writeBodyMetricsToHealth,
   writeCaloriesToHealth,
-  checkHealthAvailability,
-  requestHealthPermissions,
-  getHealthSyncStatus,
+  writeWorkoutToHealth,
+  writeWorkoutsToHealth
 } from './healthSync';
-import type { HealthWorkout, HealthBodyMetrics, HealthSyncOptions } from '../types/health';
 
 const SYNC_PREFERENCES_KEY = 'healthSyncOptions';
 const LAST_SYNC_DATE_KEY = 'healthLastSyncDate';
@@ -62,7 +59,7 @@ export async function saveHealthSyncOptions(options: HealthSyncOptions): Promise
  * Get last sync date
  */
 export async function getLastSyncDate(): Promise<Date | null> {
-  const dateStr = await getPreference<string>(LAST_SYNC_DATE_KEY, null);
+  const dateStr = await getPreference<string | null>(LAST_SYNC_DATE_KEY, null);
   return dateStr ? new Date(dateStr) : null;
 }
 
@@ -154,8 +151,9 @@ function estimateWorkoutDuration(exerciseName: string, reps: number): number {
 
 /**
  * Calculate calories for a workout using MET values
+ * Exported for use in other components to ensure consistent calculations
  */
-function calculateWorkoutCalories(
+export function calculateWorkoutCalories(
   exerciseName: string,
   weightLbs: number,
   reps: number,
@@ -172,6 +170,64 @@ function calculateWorkoutCalories(
   // Calories = (MET * weightKg * 3.5 / 200) * duration (min)
   const calories = (met * weightKg * 3.5 / 200) * durationMin;
   return Math.round(calories);
+}
+
+/**
+ * Get the start of the current week (Monday)
+ */
+function getStartOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust so Monday is day 1
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0); // Set to start of day
+  return d;
+}
+
+/**
+ * Calculate total weekly calories from app's workout logs (fallback when Health isn't available)
+ * This ensures weekly_calories is populated even if Health sync is disabled
+ * Uses Monday-based week (Monday to Sunday) for consistency with goals
+ */
+export async function calculateWeeklyCaloriesFromLogs(startDate?: Date, endDate?: Date): Promise<number> {
+  // If no dates provided, use current week (Monday to now)
+  const now = new Date();
+  const weekStart = startDate || getStartOfWeek(now);
+  const weekEnd = endDate || now;
+  try {
+    const logs = await getWorkoutLogs();
+    const profile = await getProfile();
+    const profileWeightLbs = profile?.weight 
+      ? parseFloat(profile.weight.match(/(\d+\.?\d*)/)?.[1] || '170')
+      : 170;
+
+    // Normalize dates to start of day for comparison (ignore time components)
+    const startOfDay = new Date(weekStart);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(weekEnd);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    let totalCalories = 0;
+    let matchedLogs = 0;
+    
+    for (const log of logs) {
+      const logDate = new Date(log.date);
+      logDate.setHours(0, 0, 0, 0);
+      
+      // Only include logs within the date range
+      if (logDate >= startOfDay && logDate <= endOfDay) {
+        const calories = calculateWorkoutCalories(log.exercise, log.weight, log.reps, profileWeightLbs);
+        totalCalories += calories;
+        matchedLogs++;
+      }
+    }
+
+    console.log(`📊 Calculated weekly calories from logs: ${totalCalories} cal from ${matchedLogs} workouts (${logs.length} total logs, range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()})`);
+    return totalCalories;
+  } catch (error) {
+    console.error('Error calculating weekly calories from logs:', error);
+    return 0;
+  }
 }
 
 /**

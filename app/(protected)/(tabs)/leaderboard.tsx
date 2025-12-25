@@ -257,13 +257,13 @@ export default function LeaderboardScreen() {
     const minUsersThreshold = 5;
     let selectedData: LeaderboardEntry[] = [];
     let title = 'Weekly Rankings';
-    let scope = 'Global';
+    let scope = '';
 
     try {
       // Start with the most common case: Weekly + Global + All
-      // This is the cheapest query (no user-specific filtering)
+      // Use 'calories' sort for weekly leaderboard since weekly_calories is the relevant metric
       const globalAll = await fetchLeaderboardData(
-        'total', 'weekly', 'global', 'all', forceRefresh, undefined, SMART_ROW_LIMIT
+        'calories', 'weekly', 'global', 'all', forceRefresh, undefined, SMART_ROW_LIMIT
       );
 
       // If we have enough users in weekly global, use it and skip other queries
@@ -271,15 +271,16 @@ export default function LeaderboardScreen() {
         // Only try more specific queries if user is logged in
         if (user) {
           // Try global similar (one extra query)
+          // Use 'calories' sort for weekly leaderboard
           const globalSimilar = await fetchLeaderboardData(
-            'total', 'weekly', 'global', 'similar', forceRefresh, undefined, SMART_ROW_LIMIT
+            'calories', 'weekly', 'global', 'similar', forceRefresh, undefined, SMART_ROW_LIMIT
           );
 
           if (globalSimilar.length >= minUsersThreshold) {
             // Check local similar only if user has location and opted in
             if (userLocation?.country && preferences.shareLocation) {
               const localSimilar = await fetchLeaderboardData(
-                'total', 'weekly', 'country', 'similar', forceRefresh, userLocation.country, SMART_ROW_LIMIT
+                'calories', 'weekly', 'country', 'similar', forceRefresh, userLocation.country, SMART_ROW_LIMIT
               );
 
               if (localSimilar.length >= minUsersThreshold) {
@@ -289,30 +290,38 @@ export default function LeaderboardScreen() {
               } else {
                 selectedData = globalSimilar;
                 title = 'Similar Strength League';
-                scope = 'Global • Weekly';
+                scope = 'Weekly';
               }
             } else {
               selectedData = globalSimilar;
               title = 'Similar Strength League';
-              scope = 'Global • Weekly';
+              scope = 'Weekly';
             }
+            // Set sort mode to calories for weekly view
+            setSortMode('calories');
           } else {
             // Not enough similar users, use global all
             selectedData = globalAll;
             title = 'Weekly Leaderboard';
-            scope = 'Global';
+            scope = '';
+            // Set sort mode to calories for weekly view
+            setSortMode('calories');
           }
         } else {
           // User not logged in, just show global weekly
           selectedData = globalAll;
           title = 'Weekly Leaderboard';
-          scope = 'Global';
+          scope = '';
+          // Set sort mode to calories for weekly view
+          setSortMode('calories');
         }
       } else if (globalAll.length > 0) {
         // Some users but less than threshold
         selectedData = globalAll;
         title = 'Weekly Leaderboard';
-        scope = 'Global';
+        scope = '';
+        // Set sort mode to calories for weekly view
+        setSortMode('calories');
       } else {
         // No weekly data, fall back to all time
         const allTime = await fetchLeaderboardData(
@@ -320,7 +329,7 @@ export default function LeaderboardScreen() {
         );
         selectedData = allTime;
         title = 'All-Time Leaderboard';
-        scope = 'Global';
+        scope = '';
       }
 
       if (isMountedRef.current) {
@@ -442,11 +451,18 @@ export default function LeaderboardScreen() {
                 </Text>
                 {/* Small detail line */}
                 <Text style={styles.simpleUserDetail}>
-                  {entry.location_country || 'Global'} • {formatDate(entry.updated_at)}
+                  {entry.location_country || 'All'} • {formatDate(entry.updated_at)}
                 </Text>
               </View>
               
-              <Text style={styles.simpleScore}>{entry.total_score} lbs</Text>
+              <Text style={styles.simpleScore}>
+                {sortMode === 'wilks' 
+                  ? `${entry.wilks_score?.toFixed(1) || '-'} Wilks`
+                  : sortMode === 'calories'
+                  ? `${entry.weekly_calories || 0} cal`
+                  : `${entry.total_score} lbs`
+                }
+              </Text>
             </View>
           );
         })
@@ -567,7 +583,7 @@ export default function LeaderboardScreen() {
                   onPress={() => setLocationFilter('global')}
                 >
                   <Ionicons name="planet-outline" size={14} color={locationFilter === 'global' ? '#FFF' : '#8E8E93'} style={{ marginRight: 4 }} />
-                  <Text style={[styles.filterText, locationFilter === 'global' && styles.filterTextActive]}>Global</Text>
+                  <Text style={[styles.filterText, locationFilter === 'global' && styles.filterTextActive]}>All</Text>
                 </TouchableOpacity>
                 
                 {/* Only show location button if not opted out */}
@@ -674,7 +690,7 @@ export default function LeaderboardScreen() {
           <View style={styles.subtitleContainer}>
             <Text style={styles.subtitle}>
               {timeFilter === 'weekly' ? 'Active in last 7 days' : 'All-time'}
-              {locationFilter === 'country' ? ` • ${userLocation?.country || 'Local'}` : ' • Global'}
+              {locationFilter === 'country' ? ` • ${userLocation?.country || 'Local'}` : ''}
               {scoreFilter === 'similar' ? ' • Similar Strength' : ''}
             </Text>
           </View>

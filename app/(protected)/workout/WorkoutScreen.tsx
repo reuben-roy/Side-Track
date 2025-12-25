@@ -47,7 +47,7 @@ interface ExerciseStats {
 
 export default function WorkoutScreen({ exercise, weight, reps, onClose }: WorkoutScreenProps) {
   const { profile } = useProfile();
-  const { updateCapacityFromWorkout, capacityLimits } = useUserCapacity();
+  const { updateCapacityFromWorkout, capacityLimits, syncStrengthToSupabase } = useUserCapacity();
   
   // Find the exercise object
   const exerciseObj = exercises.find(e => e.name === exercise);
@@ -126,16 +126,19 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
     }
   };
 
-  // Flush workout session to Apple Health when app goes to background
+  // Flush workout session and sync to Supabase when app goes to background
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
-        // App is going to background - flush the workout session
-        console.log('App backgrounding - flushing workout session...');
+        // App is going to background - flush the workout session and sync
+        console.log('App backgrounding - flushing workout session and syncing...');
         try {
           await flushWorkoutSession();
+          // Wait a moment for workout to be fully saved before syncing calories
+          await new Promise(resolve => setTimeout(resolve, 300));
+          await syncStrengthToSupabase();
         } catch (error) {
-          console.error('Error flushing workout session on background:', error);
+          console.error('Error flushing workout session or syncing on background:', error);
         }
       }
       appState.current = nextAppState;
@@ -143,21 +146,33 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
-  }, []);
+  }, [syncStrengthToSupabase]);
 
-  // Handle screen close - flush session and call original onClose
+  // Handle screen close - flush session, sync to Supabase, then call original onClose
   const handleClose = useCallback(async () => {
     const pendingCount = getPendingSetCount();
     if (pendingCount > 0) {
       console.log(`Closing workout screen - flushing ${pendingCount} pending sets...`);
       try {
         await flushWorkoutSession();
+        // Wait a moment for workout to be fully saved before syncing calories
+        await new Promise(resolve => setTimeout(resolve, 300));
       } catch (error) {
         console.error('Error flushing workout session on close:', error);
       }
     }
+    
+    // Sync to Supabase when workout screen closes (ensures new workout is included)
+    try {
+      console.log('Syncing to Supabase after workout screen close...');
+      await syncStrengthToSupabase();
+    } catch (syncError) {
+      console.error('Error syncing to Supabase on close:', syncError);
+      // Don't block closing if sync fails
+    }
+    
     onClose();
-  }, [onClose]);
+  }, [onClose, syncStrengthToSupabase]);
 
   const loadMuscleCapacity = async () => {
     try {
@@ -338,6 +353,9 @@ export default function WorkoutScreen({ exercise, weight, reps, onClose }: Worko
         console.error('Health sync error:', healthError);
       }
       // --- End health sync ---
+
+      // Note: Supabase sync will happen when workout screen closes or app backgrounds
+      // This avoids hitting Supabase too frequently and ensures new workout is included
 
       setLogging(false);
       setShowToast(true);

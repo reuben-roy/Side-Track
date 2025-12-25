@@ -1,4 +1,5 @@
 import { getPreference, getProfile, getWorkoutLogs, setPreference, WorkoutLog } from '@/lib/database';
+import { calculateWeeklyCaloriesFromLogs, calculateWorkoutCalories } from '@/lib/healthSyncHelper';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { exercises } from '../constants/Exercises';
@@ -57,23 +58,22 @@ export default function GoalsDisplay({ onRefresh }: GoalsDisplayProps) {
       const logs = await getWorkoutLogs();
       
       // Calculate calories for week and month
+      // Use the same calculation method as Supabase sync for consistency
       const now = new Date();
       const startOfWeek = getStartOfWeek(now);
       const startOfMonth = getStartOfMonth(now);
 
-      let weekCals = 0;
-      let monthCals = 0;
+      // Calculate weekly calories using the same function as Supabase sync (Monday-based week)
+      const weekCals = await calculateWeeklyCaloriesFromLogs(startOfWeek, now);
 
+      // Calculate monthly calories (from start of month)
+      // Use the same calculation method as Supabase sync for consistency
+      let monthCals = 0;
       logs.forEach((log: WorkoutLog) => {
         const logDate = new Date(log.date);
-        const met = getExerciseMET(log.exercise);
-        const durationMin = 2; // 2 minutes per set
-        const cals = (met * weightKg * 3.5 / 200) * durationMin;
-
-        if (logDate >= startOfWeek) {
-          weekCals += cals;
-        }
         if (logDate >= startOfMonth) {
+          // Use the same calculateWorkoutCalories function for consistency
+          const cals = calculateWorkoutCalories(log.exercise, log.weight, log.reps, weightLbs);
           monthCals += cals;
         }
       });
